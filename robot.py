@@ -2,8 +2,10 @@ from magicbot import MagicRobot
 from ntcore import NetworkTableInstance
 from phoenix6 import CANBus
 from wpilib import (
+    Color8Bit,
     DataLogManager,
     DriverStation,
+    Mechanism2d,
     RobotController,
     SmartDashboard,
     Timer,
@@ -15,9 +17,10 @@ from wpimath.kinematics import ChassisSpeeds
 
 from components.climber import Climber
 from components.drivetrain import DriveSignal, Drivetrain
+from components.intake import Intake
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
 from utilities import helpers as utils
-from utilities.configs import DrivetrainConfig, SwerveConfig
+from utilities.configs import DrivetrainConfig, IntakeConfig, SwerveConfig
 from utilities.elasticlib import Notification, NotificationLevel, NotificationManager
 from utilities.helpers import FFConstants, MotorTypes, PIDConstants
 from utilities.IO_helpers import IO
@@ -26,6 +29,7 @@ from utilities.IO_helpers import IO
 class MyRobot(MagicRobot):
     drivetrain: Drivetrain
     climber: Climber
+    intake: Intake
 
     def createObjects(self) -> None:
         DataLogManager.start()
@@ -46,6 +50,7 @@ class MyRobot(MagicRobot):
 
         self.controller = XboxController(0)
         self.CANbus = CANBus("*")
+
         swerve_config = SwerveConfig(
             drive_ratio=1 / 7.7142857,
             steer_ratio=1 / 7.7142857,
@@ -78,6 +83,23 @@ class MyRobot(MagicRobot):
             swerve_config=swerve_config,
             CANbus=self.CANbus,
         )
+
+        self.intake_config = IntakeConfig(
+            roller_id=0,
+            beam_break_id=0,
+            pivot_motor_id=0,
+            gear_ratio=16/510,
+            pivot_ff=FFConstants(0, 0, 0, 0),
+            pivot_pid=PIDConstants(0, 0, 0),
+            pivot_max_vel=0,
+            pivot_max_acc=0,
+            CANbus=self.CANbus,
+        )
+
+        self.mech = Mechanism2d(4, 4, Color8Bit(255, 255, 255))
+        self.intake_mech_root = self.mech.getRoot("Intake", 0, 1.5)
+
+        SmartDashboard.putData("Mechanism", self.mech)
 
         self.timer = Timer()
         self._set_up_notifications()

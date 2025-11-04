@@ -129,20 +129,7 @@ class GenericTalonFXModule(Module):
         self._set_up_logging()
 
     def _set_up_logging(self) -> None:
-        self.io.offset = self.offset
         self.io.add_function(self.get_module_voltage)
-        self.io.add_function(self.get_magnitude)
-
-        # self.io.add_ctre_device(
-        #     self.drive_motor,
-        #     self.steer_motor,
-        #     self.steer_encoder,
-        #     names=(
-        #         self.name + " drive motor",
-        #         self.name + " steer motor",
-        #         self.name + " encoder",
-        #     ),
-        # )
 
     def get_drive_position(self) -> units.meters:
         return (
@@ -170,10 +157,9 @@ class GenericTalonFXModule(Module):
         )
 
     def get_magnitude(self) -> units.meters_per_second:
-        self.io.module_speed = math.hypot(
+        return math.hypot(
             self.drive_motor.get_velocity().value, self.steer_motor.get_velocity().value
         )
-        return self.io.module_speed
 
     def get_angle(self) -> units.radians:
         return (
@@ -200,9 +186,6 @@ class GenericTalonFXModule(Module):
 
         desired_state.optimize(rot)
         desired_state.cosineScale(rot)
-
-        self.io.desired_speed = desired_state.speed
-        self.io.desired_angle = desired_state.angle.degrees()
 
         drive_volts = self.feed_forward.calculate(
             desired_state.speed

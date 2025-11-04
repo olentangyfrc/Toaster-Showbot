@@ -187,6 +187,8 @@ class PhysicsEngine:
 
         self.gyro = robot.drivetrain.gyro.sim_state
 
+        # TODO: Get some measurements and create good arm sim
+
         self.current_draws = []
 
     def update_sim(self, now: float, tm_diff: float) -> None:

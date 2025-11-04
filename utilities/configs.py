@@ -58,3 +58,16 @@ class DrivetrainConfig:
     module_type: type[Module]
     swerve_config: SwerveConfig
     CANbus: CANBus
+
+
+@dataclass
+class IntakeConfig:
+    roller_id: int
+    beam_break_id: int
+    pivot_motor_id: int
+    gear_ratio: float
+    pivot_ff: FFConstants
+    pivot_pid: PIDConstants
+    pivot_max_vel: units.radians_per_second
+    pivot_max_acc: units.radians_per_second_squared
+    CANbus: CANBus

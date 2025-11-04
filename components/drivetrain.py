@@ -214,7 +214,6 @@ class Drivetrain:
         if not isinstance(signal, DriveSignal):
             raise ValueError("Signal can only be set to type DriveSignal")
 
-        self.io.commanded_speed = signal.speed
         self.io.field_relative = signal.get_field_relative()
 
         self._signal = signal
@@ -229,7 +228,6 @@ class Drivetrain:
         estimator_pose = self.pose_estimator.getEstimatedPosition()
         self.io.odometery_pose = self.odometery.getPose()
 
-        self.io.odometery_pose_str = get_struct_string(self.io.odometery_pose)
         self.io.pose_str = get_struct_string(estimator_pose)
 
         return estimator_pose
@@ -385,7 +383,6 @@ class Drivetrain:
             self.last_discretization_timestamp = self.timer.getFPGATimestamp()
 
         self.io.applied_speed = signal.speed
-        self.io.applied_speed_str = get_struct_string(signal.speed)
 
         target_states = self.kinematics.desaturateWheelSpeeds(
             self.kinematics.toSwerveModuleStates(signal.speed),
@@ -421,7 +418,6 @@ class Drivetrain:
         )
 
         self.io.actual_speed = self.kinematics.toChassisSpeeds(self.get_module_states())
-        self.io.actual_speed_str = get_struct_string(self.io.actual_speed)
 
         self.io.last_module_positions = self.get_module_positions()
 
@@ -508,6 +504,7 @@ class Drivetrain:
 
     def _handle_state_logic(self) -> None:
         self.io.state = self.state.name if self.state is not None else "None"
+
         match self.state:
             case DrivetrainStates.PASSIVE_SNAP:
                 self.target_rotation = self.get_pose().rotation()
@@ -581,9 +578,6 @@ class Drivetrain:
         self.io.add_function(self.get_module_states)
 
         self.io.add_function(self.is_aligned)
-        self.io.add_function(self.is_stationary)
-        self.io.add_function(self.is_motion_limited)
-        # self.io.add_ctre_device(self.gyro, names="gyro")
 
         SmartDashboard.putData("Drivetrain Field", self.drivetrain_field)
         SmartDashboard.putData(
