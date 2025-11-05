@@ -20,7 +20,7 @@ from utilities.IO import IntakeIO
 ZERO_POSITION = math.radians(96.843)  # Prolly should dbl check this number
 
 FEED_DELAY = 0.03
-INTAKE_DELAY = 0.03
+INTAKE_DELAY = 0
 
 
 class IntakeStates(Enum):
@@ -52,10 +52,9 @@ class Intake:
             config.pivot_max_vel, config.pivot_max_acc
         )
         self.pivot_ff = controller.ArmFeedforward(
-            config.pivot_ff.kS,
-            config.pivot_ff.kG,  # type: ignore
-            config.pivot_ff.kV,
-            config.pivot_ff.kA,
+            0.19,
+            0.41,
+            0.0
         )
         self.pivot_pid = controller.ProfiledPIDController(
             config.pivot_pid.p,
@@ -65,7 +64,7 @@ class Intake:
         )
         self.pivot_pid.setTolerance(0.03)
         self.pivot_pid.reset(ZERO_POSITION)
-        self.pivot_motor.set_position(ZERO_POSITION / math.tau / self.config.gear_ratio)
+        self.pivot_motor.set_position(ZERO_POSITION / math.tau / config.gear_ratio)
 
         self._state = IntakeStates.IDLE
 
@@ -159,7 +158,7 @@ class Intake:
             self.pivot_voltage_request.with_output(
                 self.pivot_pid.calculate(self.get_pivot_position())
                 + self.pivot_ff.calculate(
-                    self.get_pivot_position(), self.get_pivot_velocity()
+                    self.get_pivot_position(), 0
                 )
             ).with_enable_foc(False)
         )
@@ -188,25 +187,22 @@ class Intake:
                 self.io.target_pivot_position = math.radians(45)
 
             case IntakeStates.DEPLOYED:
-                self.io.target_roller_voltage = 6
-                self.io.target_pivot_position = math.radians(-16.8)
+                self.io.target_roller_voltage = 2
+                self.io.target_pivot_position = math.radians(-14)
 
                 if self.has_note():
-                    if not self.intake_timer.isRunning():
-                        self.intake_timer.start()
-
-                    if self.intake_timer.get() >= INTAKE_DELAY:
-                        self.intake_timer.stop()
-                        self.intake_timer.reset()
-
-                        self.state = IntakeStates.IDLE
+                    self.state = IntakeStates.RETRACTING
 
             case IntakeStates.FEEDING:
-                self.io.target_roller_voltage = 4
+                self.io.target_roller_voltage = 0
+                self.io.target_pivot_position = math.radians(90)
+            
+            case IntakeStates.RETRACTING:
+                self.io.target_roller_voltage = 0.2
                 self.io.target_pivot_position = math.radians(90)
 
-                if not self.has_note():
-                    self.state = IntakeStates.IDLE
+                if self.at_target_position():
+                    self.state = IntakeStates.FEEDING
 
     def _set_up_logging(self) -> None:
         self.io.add_function(self.has_note)

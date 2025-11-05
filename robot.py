@@ -17,7 +17,7 @@ from wpimath.kinematics import ChassisSpeeds
 
 from components.climber import Climber
 from components.drivetrain import DriveSignal, Drivetrain
-from components.intake import Intake
+from components.intake import Intake, IntakeStates
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
 from utilities import helpers as utils
 from utilities.configs import DrivetrainConfig, IntakeConfig, SwerveConfig
@@ -85,12 +85,12 @@ class MyRobot(MagicRobot):
         )
 
         self.intake_config = IntakeConfig(
-            roller_id=0,
-            beam_break_id=0,
-            pivot_motor_id=0,
+            roller_id=42,
+            beam_break_id=3,
+            pivot_motor_id=31,
             gear_ratio=16/510,
-            pivot_ff=FFConstants(0, 0, 0, 0),
-            pivot_pid=PIDConstants(0, 0, 0),
+            pivot_ff=FFConstants(0, 0, 0, 0.45),
+            pivot_pid=PIDConstants(5.3, 0, 0.07),
             pivot_max_vel=0,
             pivot_max_acc=0,
             CANbus=self.CANbus,
@@ -127,8 +127,14 @@ class MyRobot(MagicRobot):
         if self.controller.getYButtonPressed():
             self.drivetrain.gyro.set_yaw(0)
 
-        if self.controller.getRightBumperPressed():
-            self.climber.set_manual_voltage(2)
+        if self.controller.getStartButton():
+            if not self.intake.has_note():
+                self.intake.go_to_idle()
+
+        if self.controller.getRightTriggerAxis() > 0.2 and not self.intake.has_note() and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
+            self.intake.grab_note()
+        elif self.intake.state == IntakeStates.DEPLOYED:
+            self.intake.go_to_idle()
 
         if self.controller.getLeftBumperPressed():
             self.climber.set_manual_voltage(-2)
