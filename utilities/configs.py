@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 import wpimath.units as units
 from phoenix6 import CANBus
 
-from utilities.helpers import FREE_SPEED_LOOKUP, FFConstants, MotorTypes, PIDConstants
+from utilities.helpers import (
+    FREE_SPEED_LOOKUP,
+    FFConstants,
+    MotorTypes,
+    PIDConstants,
+    ProfileConstants,
+)
 
 # This deals with circular imports for type annotations
 if TYPE_CHECKING:
@@ -68,6 +74,5 @@ class IntakeConfig:
     gear_ratio: float
     pivot_ff: FFConstants
     pivot_pid: PIDConstants
-    pivot_max_vel: units.radians_per_second
-    pivot_max_acc: units.radians_per_second_squared
+    profile_constants: ProfileConstants
     CANbus: CANBus

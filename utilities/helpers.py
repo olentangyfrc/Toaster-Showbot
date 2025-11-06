@@ -25,6 +25,11 @@ class FFConstants(NamedTuple):
     kG: Optional[float] = None
 
 
+class ProfileConstants(NamedTuple):
+    max_vel: float
+    max_acc: float
+
+
 class MotorTypes(Enum):
     KRAKEN_X60 = "Kraken X60"
     KRAKEN_X60_FOC = "Kraken X60 FOC"

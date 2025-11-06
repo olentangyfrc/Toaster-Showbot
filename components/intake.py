@@ -2,22 +2,22 @@ import math
 from enum import Enum
 
 import wpilib
-import wpimath.controller as controller
-import wpimath.trajectory as trajectory
 import wpimath.units as units
 from magicbot import tunable
-from phoenix6 import BaseStatusSignal, configs, controls, hardware, signals
+from phoenix6 import BaseStatusSignal
+from phoenix6.configs import TalonFXConfiguration
+from phoenix6.controls import VoltageOut
+from phoenix6.hardware import TalonFX
+from phoenix6.signals import InvertedValue, NeutralModeValue
 from wpilib import Color8Bit, DigitalInput, MechanismRoot2d, RobotBase, SmartDashboard
+from wpimath.controller import ArmFeedforward, ProfiledPIDController
 from wpimath.filter import SlewRateLimiter
+from wpimath.trajectory import TrapezoidProfile
 
 from utilities.configs import IntakeConfig
 from utilities.IO import IntakeIO
 
-# TODO:
-#   create a config with CAN ID's, Gear Ratio, PID Constants
-#   create IO class
-
-ZERO_POSITION = math.radians(96.843)  # Prolly should dbl check this number
+ZERO_POSITION = math.radians(96.843)
 
 FEED_DELAY = 0.03
 INTAKE_DELAY = 0
@@ -35,28 +35,29 @@ class Intake:
     manual_tuning_mode = tunable(False)
 
     def __init__(self, config: IntakeConfig, mech_root: MechanismRoot2d) -> None:
-        self.intake_rollers_motor = hardware.TalonFX(config.roller_id, config.CANbus)
+        self.intake_rollers_motor = TalonFX(config.roller_id, config.CANbus)
         self.beam_break = DigitalInput(config.beam_break_id)
 
-        self.pivot_configs = configs.TalonFXConfiguration()
-        self.pivot_configs.motor_output.neutral_mode = signals.NeutralModeValue.BRAKE
-        # self.pivot_configs.current_limits.supply_current_limit = 2  # What???
+        self.pivot_configs = TalonFXConfiguration()
+        self.pivot_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
         self.pivot_configs.motor_output.inverted = (
-            signals.InvertedValue.COUNTER_CLOCKWISE_POSITIVE
+            InvertedValue.COUNTER_CLOCKWISE_POSITIVE
         )
 
-        self.pivot_motor = hardware.TalonFX(config.pivot_motor_id, config.CANbus)
+        self.pivot_motor = TalonFX(config.pivot_motor_id, config.CANbus)
         self.pivot_motor.configurator.apply(self.pivot_configs)
 
-        self.pid_constraints = trajectory.TrapezoidProfile.Constraints(
-            config.pivot_max_vel, config.pivot_max_acc
+        self.pid_constraints = TrapezoidProfile.Constraints(
+            config.profile_constants.max_vel, config.profile_constants.max_acc
         )
-        self.pivot_ff = controller.ArmFeedforward(
-            0.19,
-            0.41,
-            0.0
+        self.pivot_ff = ArmFeedforward(
+            config.pivot_ff.kS,
+            config.pivot_ff.kG if config.pivot_ff.kG is not None else 0.0,
+            config.pivot_ff.kA,
+            config.pivot_ff.kV,
         )
-        self.pivot_pid = controller.ProfiledPIDController(
+
+        self.pivot_pid = ProfiledPIDController(
             config.pivot_pid.p,
             config.pivot_pid.i,
             config.pivot_pid.d,
@@ -68,8 +69,8 @@ class Intake:
 
         self._state = IntakeStates.IDLE
 
-        self.intake_voltage_request = controls.VoltageOut(0)
-        self.pivot_voltage_request = controls.VoltageOut(0)
+        self.intake_voltage_request = VoltageOut(0)
+        self.pivot_voltage_request = VoltageOut(0)
 
         self.intake_timer = wpilib.Timer()
 
@@ -115,9 +116,7 @@ class Intake:
         if RobotBase.isSimulation():
             return self.sim_angle
 
-        return (
-            self.io.pivot_position_supplier.value * math.tau * self.config.gear_ratio
-        )  # Change this to IO
+        return self.io.pivot_position_supplier.value * math.tau * self.config.gear_ratio
 
     def get_pivot_velocity(self) -> units.radians_per_second:
         return self.io.pivot_velocity_supplier.value * math.tau * self.config.gear_ratio
@@ -127,7 +126,10 @@ class Intake:
 
     def at_target_position(self) -> bool:
         if RobotBase.isSimulation():
-            return abs(self.sim_angle - self.pivot_pid.getGoal().position) <= self.pivot_pid.getPositionTolerance() 
+            return (
+                abs(self.sim_angle - self.pivot_pid.getGoal().position)
+                <= self.pivot_pid.getPositionTolerance()
+            )
         return self.pivot_pid.atGoal()
 
     def execute(self):
@@ -139,16 +141,15 @@ class Intake:
         ):
             self.pivot_pid.setGoal(self.io.target_pivot_position)
 
-        if (
-            RobotBase.isSimulation()
-            and not self.at_target_position()
-        ):
+        if RobotBase.isSimulation() and not self.at_target_position():
             if self.pivot_pid.getP() == 0:
                 return
-            
+
             intermediate = self.sim_angle
 
-            intermediate += (self.pivot_pid.getGoal().position - self.sim_angle)/self.pivot_pid.getP()
+            intermediate += (
+                self.pivot_pid.getGoal().position - self.sim_angle
+            ) / self.pivot_pid.getP()
             self.sim_angle = self.sim_limiter.calculate(intermediate)
 
             self.mech_ligament.setAngle(math.degrees(self.get_pivot_position()))
@@ -157,9 +158,7 @@ class Intake:
         self.pivot_motor.set_control(
             self.pivot_voltage_request.with_output(
                 self.pivot_pid.calculate(self.get_pivot_position())
-                + self.pivot_ff.calculate(
-                    self.get_pivot_position(), 0
-                )
+                + self.pivot_ff.calculate(self.get_pivot_position(), 0)
             ).with_enable_foc(False)
         )
 
@@ -196,7 +195,7 @@ class Intake:
             case IntakeStates.FEEDING:
                 self.io.target_roller_voltage = 0
                 self.io.target_pivot_position = math.radians(90)
-            
+
             case IntakeStates.RETRACTING:
                 self.io.target_roller_voltage = 0.2
                 self.io.target_pivot_position = math.radians(90)

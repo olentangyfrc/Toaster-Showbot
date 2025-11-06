@@ -22,7 +22,7 @@ from components.modules.generic_talon_fx_module import GenericTalonFXModule
 from utilities import helpers as utils
 from utilities.configs import DrivetrainConfig, IntakeConfig, SwerveConfig
 from utilities.elasticlib import Notification, NotificationLevel, NotificationManager
-from utilities.helpers import FFConstants, MotorTypes, PIDConstants
+from utilities.helpers import FFConstants, MotorTypes, PIDConstants, ProfileConstants
 from utilities.IO_helpers import IO
 
 
@@ -88,11 +88,10 @@ class MyRobot(MagicRobot):
             roller_id=42,
             beam_break_id=3,
             pivot_motor_id=31,
-            gear_ratio=16/510,
-            pivot_ff=FFConstants(0, 0, 0, 0.45),
+            gear_ratio=16 / 510,
+            pivot_ff=FFConstants(0.19, 0, 0, 0.41),
             pivot_pid=PIDConstants(5.3, 0, 0.07),
-            pivot_max_vel=0,
-            pivot_max_acc=0,
+            profile_constants=ProfileConstants(0, 0),  # TODO: probably implement these
             CANbus=self.CANbus,
         )
 
@@ -127,11 +126,14 @@ class MyRobot(MagicRobot):
         if self.controller.getYButtonPressed():
             self.drivetrain.gyro.set_yaw(0)
 
-        if self.controller.getStartButton():
-            if not self.intake.has_note():
-                self.intake.go_to_idle()
+        if self.controller.getStartButton() and not self.intake.has_note():
+            self.intake.go_to_idle()
 
-        if self.controller.getRightTriggerAxis() > 0.2 and not self.intake.has_note() and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
+        if (
+            self.controller.getRightTriggerAxis() > 0.2
+            and not self.intake.has_note()
+            and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
+        ):
             self.intake.grab_note()
         elif self.intake.state == IntakeStates.DEPLOYED:
             self.intake.go_to_idle()
