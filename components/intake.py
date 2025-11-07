@@ -14,10 +14,13 @@ from wpimath.controller import ArmFeedforward, ProfiledPIDController
 from wpimath.filter import SlewRateLimiter
 from wpimath.trajectory import TrapezoidProfile
 
+from physics import SimplePControllerSim
 from utilities.configs import IntakeConfig
+from utilities.helpers import clamp
 from utilities.IO import IntakeIO
 
 ZERO_POSITION = math.radians(96.843)
+MIN_POSITION = math.radians(-17)
 
 FEED_DELAY = 0.03
 INTAKE_DELAY = 0
@@ -79,14 +82,14 @@ class Intake:
         self.io = IntakeIO()
         self._set_up_logging()
 
-        # TODO: Replace this approach with actual simulation
-        self.sim_angle = ZERO_POSITION
-        self.sim_limiter = SlewRateLimiter(1.5)
+        self.pid_sim = SimplePControllerSim(
+            self.pivot_pid, SlewRateLimiter(6), ZERO_POSITION
+        )
 
         self.mech_ligament = mech_root.appendLigament(
             name="Arm ligament",
             length=1.5,
-            angle=math.degrees(self.sim_angle),
+            angle=math.degrees(self.get_pivot_position()),
             color=Color8Bit(0, 0, 255),  # RGB
         )
 
@@ -114,7 +117,7 @@ class Intake:
 
     def get_pivot_position(self) -> units.radians:
         if RobotBase.isSimulation():
-            return self.sim_angle
+            return self.pid_sim.value
 
         return self.io.pivot_position_supplier.value * math.tau * self.config.gear_ratio
 
@@ -126,32 +129,28 @@ class Intake:
 
     def at_target_position(self) -> bool:
         if RobotBase.isSimulation():
-            return (
-                abs(self.sim_angle - self.pivot_pid.getGoal().position)
-                <= self.pivot_pid.getPositionTolerance()
-            )
+            return self.pid_sim.at_goal()
         return self.pivot_pid.atGoal()
 
     def execute(self):
         self._handle_state_logic()
 
+        self.pid_sim.update()
+
         if (
             self.io.target_pivot_position != self.pivot_pid.getGoal().position
             and not self.manual_tuning_mode
         ):
-            self.pivot_pid.setGoal(self.io.target_pivot_position)
+            self.pivot_pid.setGoal(
+                clamp(self.io.target_pivot_position, MIN_POSITION, ZERO_POSITION)
+            )
+        elif self.manual_tuning_mode:
+            self.pivot_pid.setGoal(
+                clamp(self.pivot_pid.getGoal().position, MIN_POSITION, ZERO_POSITION)
+            )
 
-        if RobotBase.isSimulation() and not self.at_target_position():
-            if self.pivot_pid.getP() == 0:
-                return
-
-            intermediate = self.sim_angle
-
-            intermediate += (
-                self.pivot_pid.getGoal().position - self.sim_angle
-            ) / self.pivot_pid.getP()
-            self.sim_angle = self.sim_limiter.calculate(intermediate)
-
+        if RobotBase.isSimulation():
+            self.pid_sim.update()
             self.mech_ligament.setAngle(math.degrees(self.get_pivot_position()))
             return
 
