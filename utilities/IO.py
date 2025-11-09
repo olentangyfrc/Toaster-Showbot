@@ -5,6 +5,7 @@ from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import ChassisSpeeds, SwerveModulePosition, SwerveModuleState
 
 from utilities.IO_helpers import IO, PublisherSpecifications, auto_log
+import math
 
 RATIO = 0.09588832710352932  # Gear Ratio for SwerveModule
 
@@ -185,7 +186,8 @@ class ShooterIO(IO):
             "shooter_angle_velocity_supplier",
             "shooter_velocity_supplier",
             "tuning_sendables_sent"
-        }
+        },
+        modifiers={"target_shooter_angle": math.degrees}
     )
 
     shooter_angle_supplier: StatusSignal[float]
@@ -197,6 +199,8 @@ class ShooterIO(IO):
         self.target_shooter_angle = 0.0
         self.indexer_voltage = 0.0
         self.target_shooter_speed = 0.0
+
+        self.pivot_target_voltage = 0.0
         
         self.tuning_sendables_sent = False
         

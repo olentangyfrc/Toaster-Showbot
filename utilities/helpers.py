@@ -8,20 +8,25 @@ import wpimath
 import wpimath.units as units
 from wpimath.geometry import Pose2d, Rotation2d, Translation2d
 from wpimath.kinematics import ChassisSpeeds
+from wpimath.controller import ProfiledPIDController, PIDController
+from wpimath.filter import SlewRateLimiter
 
 
 class PIDConstants(NamedTuple):
-    p: float
-    i: float
-    d: float
+    p: float = 0
+    i: float = 0
+    d: float = 0
     max_speed: Optional[float] = None
     max_accel: Optional[float] = None
 
 
 class FFConstants(NamedTuple):
-    kS: float
-    kV: float
-    kA: float
+    """
+    Parameters: kS, kV, kA, kG
+    """
+    kS: float = 0
+    kV: float = 0
+    kA: float = 0
     kG: Optional[float] = None
 
 
@@ -87,6 +92,58 @@ class Struct(Protocol):
     def __repr__(self) -> str:  # All objects should have this, but just to make sure
         ...
 
+class SimplePControllerSim():
+    def __init__(
+        self,
+        controller: PIDController | ProfiledPIDController,
+        limiter: SlewRateLimiter | None,
+        initial_value: float = 0.0,
+    ) -> None:
+        self.controller = controller
+        self.limiter = limiter
+
+        self._value = initial_value
+
+        self._goal = initial_value
+
+        self._tolerance = (
+            self.controller.getPositionTolerance()
+            if isinstance(self.controller, ProfiledPIDController)
+            else self.controller.getErrorTolerance()
+        )
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+    @value.setter
+    def value(self, new_val: float) -> None:
+        raise ValueError("Do not set value manually, instead allow it to be calculated")
+    
+    def at_goal(self) -> bool:
+        self._goal = (
+            self.controller.getGoal().position
+            if isinstance(self.controller, ProfiledPIDController)
+            else self.controller.getSetpoint()
+        )
+
+        return abs(self.value - self._goal) <= self._tolerance
+
+    def update(self):
+        if self.controller.getP() == 0:
+            return
+
+        if not self.at_goal():
+            # It's a really dumbed down algorithm, but it gets the job done well enough.
+            # Probably should change to using actual sim systems after a while though.
+            
+            intermediate = self._value
+            intermediate += (self._goal - self._value) / self.controller.getP()
+            self._value = (
+                self.limiter.calculate(intermediate)
+                if self.limiter is not None
+                else intermediate
+            )
 
 FREE_SPEED_LOOKUP = {
     MotorTypes.KRAKEN_X60: 6000 / 60,

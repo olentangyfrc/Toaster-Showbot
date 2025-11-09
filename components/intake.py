@@ -14,9 +14,8 @@ from wpimath.controller import ArmFeedforward, ProfiledPIDController
 from wpimath.filter import SlewRateLimiter
 from wpimath.trajectory import TrapezoidProfile
 
-from physics import SimplePControllerSim
 from utilities.configs import IntakeConfig
-from utilities.helpers import clamp
+from utilities.helpers import clamp, SimplePControllerSim
 from utilities.IO import IntakeIO
 
 ZERO_POSITION = math.radians(96.843)

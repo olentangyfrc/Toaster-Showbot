@@ -37,60 +37,6 @@ class SimSystem(ABC):
     def update(self, dt: units.seconds) -> None: ...
 
 
-class SimplePControllerSim(SimSystem):
-    def __init__(
-        self,
-        controller: PIDController | ProfiledPIDController,
-        limiter: SlewRateLimiter | None,
-        initial_value: float = 0.0,
-    ) -> None:
-        self.controller = controller
-        self.limiter = limiter
-
-        self._value = initial_value
-
-        self._goal = initial_value
-
-        self._tolerance = (
-            self.controller.getPositionTolerance()
-            if isinstance(self.controller, ProfiledPIDController)
-            else self.controller.getErrorTolerance()
-        )
-
-    @property
-    def value(self) -> float:
-        return self._value
-
-    @value.setter
-    def value(self, new_val: float) -> None:
-        raise ValueError("Do not set value manually, instead allow it to be calculated")
-    
-    def at_goal(self) -> bool:
-        self._goal = (
-            self.controller.getGoal().position
-            if isinstance(self.controller, ProfiledPIDController)
-            else self.controller.getSetpoint()
-        )
-
-        return abs(self.value - self._goal) <= self._tolerance
-
-    def update(self, dt=0.2):
-        if self.controller.getP() == 0:
-            return
-
-        if not self.at_goal():
-            # It's a really dumbed down algorithm, but it gets the job done well enough.
-            # Probably should change to using actual sim systems after a while though.
-            
-            intermediate = self._value
-            intermediate += (self._goal - self._value) / self.controller.getP()
-            self._value = (
-                self.limiter.calculate(intermediate)
-                if self.limiter is not None
-                else intermediate
-            )
-
-
 class TalonFXMotorSim(SimSystem):
     def __init__(
         self,

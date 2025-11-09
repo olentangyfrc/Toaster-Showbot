@@ -13,12 +13,11 @@ from phoenix6.signals import InvertedValue, NeutralModeValue
 
 from rev import SparkMax, SparkBaseConfig
 
-from wpilib import Color8Bit, DigitalInput, MechanismRoot2d, RobotBase, SmartDashboard, DutyCycleEncoder
+from wpilib import DigitalInput, SmartDashboard, DutyCycleEncoder
 from wpimath.controller import ArmFeedforward, ProfiledPIDController, SimpleMotorFeedforwardRadians
 from wpimath.filter import SlewRateLimiter
 from wpimath.trajectory import TrapezoidProfile
 
-from physics import SimplePControllerSim
 from utilities.configs import ShooterConfig
 from utilities.helpers import clamp
 from utilities.IO import ShooterIO
@@ -34,6 +33,9 @@ SHOOTER_SHOOTING_SPEED = 20
 # Actual value is probably 53-55, but to be safe, stay lower for now
 SUBWOOFER_SHOOTING_ANGLE = 47
 
+MIN_SHOOTER_ANGLE = -7
+MAX_SHOOTER_ANGLE = 43
+
 MAX_SHOOTER_SPEED = 80
 
 class ShooterStates(Enum): 
@@ -45,11 +47,12 @@ class ShooterStates(Enum):
     EJECT = 6
 
 class Shooter: 
-    manual_tuning_mode: tunable(False)
+    manual_tuning_mode = tunable(False)
 
-    def __init__(self, config: ShooterConfig, mech_root: MechanismRoot2d): 
+    def __init__(self, config: ShooterConfig): 
         self.beam_break = DigitalInput(config.beam_bread_id)
         self.angle_absolute_encoder = DutyCycleEncoder(config.pivot_abs_encoder_id)
+        self.angle_absolute_encoder.setInverted(True)
 
         self.pivot_configs = TalonFXConfiguration()
         self.pivot_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
@@ -66,8 +69,8 @@ class Shooter:
             TrapezoidProfile.Constraints(config.pivot_profile_constraints.max_vel, 
                                          config.pivot_profile_constraints.max_acc)
         )
-        self.pivot_pid.setIZone(0.7)
-        self.pivot_pid.setTolerance(0.06)
+        self.pivot_pid.setIZone(0.2)
+        self.pivot_pid.setTolerance(0.02)
         
         self.pivot_ff = ArmFeedforward(
             config.pivot_ff.kS,
@@ -107,6 +110,9 @@ class Shooter:
 
         self.io = ShooterIO()
         self._set_up_logging()
+
+        self.pivot_motor.set_position((self.angle_absolute_encoder.get() - 0.176) / self.config.pivot_gear_ratio)
+        self.pivot_pid.reset(self.get_pivot_angle())
 
         '''
         # -2.96 in motor rotations (assumes shooter starts resting against cover)
@@ -150,17 +156,17 @@ class Shooter:
     def has_note(self) -> bool: 
         return not self.beam_break.get()
     
-    def get_pivot_degrees(self) -> float: 
-        return self.pivot_motor.get_position().value / self.config.pivot_gear_ratio * 360
+    def get_abs_position(self) -> float: 
+        return self.angle_absolute_encoder.get()
     
-    def get_pivot_radians(self) -> float: 
-        return self.pivot_motor.get_position().value / self.config.pivot_gear_ratio * math.tau
+    def get_pivot_angle(self) -> float: 
+        return self.pivot_motor.get_position().value * self.config.pivot_gear_ratio * math.tau
     
     def get_pivot_speed_radians(self) -> float: 
-        return self.pivot_motor.get_velocity().value / self.config.pivot_gear_ratio * math.tau
+        return self.pivot_motor.get_velocity().value * self.config.pivot_gear_ratio * math.tau
     
     def get_shooter_speed(self) -> float: 
-        return self.top_shoot_motor.get_velocity().value_as_double / self.config.shooter_gear_ratio
+        return self.top_shoot_motor.get_velocity().value_as_double * self.config.shooter_gear_ratio
     
     def at_target_position(self) -> bool: 
         return self.pivot_pid.atGoal()
@@ -175,14 +181,15 @@ class Shooter:
         #TODO: Implement logic with io for sport mode
         self._handle_state_logic()
             
-        self.io.target_shooter_angle = clamp(self.io.target_shooter_angle, -5, 52)
+        self.io.target_shooter_angle = clamp(self.io.target_shooter_angle, math.radians(MIN_SHOOTER_ANGLE), math.radians(MAX_SHOOTER_ANGLE))
         self.io.target_shooter_speed = clamp(self.io.target_shooter_speed, -MAX_SHOOTER_SPEED, MAX_SHOOTER_SPEED)
         self.io.indexer_voltage = clamp(self.io.indexer_voltage, -12, 12)
 
-        if (self.get_pivot_degrees() >= -7) and (self.get_pivot_degrees() <= 52): 
+        if (self.get_pivot_angle() >= math.radians(MIN_SHOOTER_ANGLE)) and (self.get_pivot_angle() <= math.radians(MAX_SHOOTER_ANGLE)): 
             self.pivot_pid.setGoal(self.io.target_shooter_angle)
             target_voltage = self.pivot_pid.calculate(
-                self.get_pivot_degrees(), self.io.target_shooter_angle) + self.pivot_ff.calculate(self.get_pivot_radians(), self.get_pivot_speed_radians())
+                self.get_pivot_angle()) + self.pivot_ff.calculate(self.get_pivot_angle(), 0.0)
+            self.io.pivot_target_voltage = target_voltage
             self.pivot_motor.set_control(VoltageOut(target_voltage))
             # Add shooter voltage to elastic
 
@@ -191,7 +198,7 @@ class Shooter:
             self.bottom_shoot_motor.set_control(VoltageOut(flywheel_voltage))
             self.indexer.setVoltage(self.io.indexer_voltage)
 
-        elif self.get_pivot_degrees() >= 52: 
+        elif self.get_pivot_angle() >= math.radians(MAX_SHOOTER_ANGLE): 
             self.pivot_motor.set_control(VoltageOut(0))
             self.top_shoot_motor.set_control(VoltageOut(0))
             self.bottom_shoot_motor.set_control(VoltageOut(0))
@@ -205,17 +212,23 @@ class Shooter:
         if self.manual_tuning_mode and not self.io.tuning_sendables_sent:
             SmartDashboard.putData("Shooter Pivot PID", self.pivot_pid)
             self.io.tuning_sendables_sent = True
+        
+        if self.manual_tuning_mode:
+            self.io.target_shooter_angle = self.pivot_pid.getGoal().position
+            self.io.target_shooter_speed = 0
+            self.io.indexer_voltage = 0
+            return
 
         self.io.state = self.state.name
 
         match self.state: 
             case ShooterStates.IDLE: 
-                self.io.target_shooter_angle = FEEDING_ANGLE
+                self.io.target_shooter_angle = math.radians(FEEDING_ANGLE)
                 self.io.indexer_voltage = 0
                 self.io.target_shooter_speed = 0
 
             case ShooterStates.FEEDING: 
-                self.io.target_shooter_angle = FEEDING_ANGLE
+                self.io.target_shooter_angle = math.radians(FEEDING_ANGLE)
                 self.io.indexer_voltage = INDEXER_FEED_VOLTAGE
                 self.io.target_shooter_speed = 0
 
@@ -227,19 +240,19 @@ class Shooter:
                     self.io.indexer_voltage = 0
 
             case ShooterStates.HOLDING: 
-                self.io.target_shooter_angle = HOLDING_ANGLE
+                self.io.target_shooter_angle = math.radians(HOLDING_ANGLE)
                 self.io.indexer_voltage = 0
                 self.io.target_shooter_speed = 0
 
             case ShooterStates.AIMING: 
-                self.io.target_shooter_angle = SUBWOOFER_SHOOTING_ANGLE
+                self.io.target_shooter_angle = math.radians(SUBWOOFER_SHOOTING_ANGLE)
                 self.io.indexer_voltage = 0
                 self.io.target_shooter_speed = SHOOTER_SHOOTING_SPEED
                 if self.at_target_position() and self.at_target_speed(): 
                     self.state = ShooterStates.SHOOTING
             
             case ShooterStates.SHOOTING: 
-                self.io.target_shooter_angle = SUBWOOFER_SHOOTING_ANGLE
+                self.io.target_shooter_angle = math.radians(SUBWOOFER_SHOOTING_ANGLE)
                 self.io.target_shooter_speed = SHOOTER_SHOOTING_SPEED
                 self.io.indexer_voltage = INDEXER_SHOOTING_VOLTAGE
                 
@@ -267,11 +280,12 @@ class Shooter:
     
     def _set_up_logging(self) -> None: 
         self.io.add_function(self.has_note)
-        self.io.add_function(self.get_pivot_degrees)
+        self.io.add_function(self.get_pivot_angle, math.degrees)
         self.io.add_function(self.get_pivot_speed_radians)
         self.io.add_function(self.at_target_position)
         self.io.add_function(self.get_shooter_speed)
         self.io.add_function(self.at_target_speed)
+        self.io.add_function(self.get_abs_position, lambda x: x - 0.176)
 
         self.io.target_shooter_angle = 0
         self.io.target_shooter_speed = 0
