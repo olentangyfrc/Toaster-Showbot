@@ -76,3 +76,19 @@ class IntakeConfig:
     pivot_pid: PIDConstants
     profile_constants: ProfileConstants
     CANbus: CANBus
+
+@dataclass
+class ShooterConfig: 
+    indexer_id: int
+    beam_bread_id: int
+    pivot_motor_id: int
+    bottom_shoot_motor_id: int
+    top_shoot_motor_id: int
+    shooter_speed_ff: FFConstants
+    shooter_gear_ratio: float
+    pivot_abs_encoder_id: int
+    pivot_pid: PIDConstants
+    pivot_profile_constraints: ProfileConstants
+    pivot_ff: FFConstants
+    pivot_gear_ratio: float
+    CANbus: CANBus

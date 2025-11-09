@@ -176,3 +176,28 @@ class IntakeIO(IO):
         self.tuning_sendables_sent = False
 
         super().__init__()
+
+@auto_log
+class ShooterIO(IO):
+    SPECIFICATIONS = PublisherSpecifications(
+        ignore_fields={
+            "shooter_angle_supplier", #TODO: Verify if I did this correctly
+            "shooter_angle_velocity_supplier",
+            "shooter_velocity_supplier",
+            "tuning_sendables_sent"
+        }
+    )
+
+    shooter_angle_supplier: StatusSignal[float]
+    shooter_angle_velocity_supplier: StatusSignal[float]
+    shooter_velocity_supplier: StatusSignal[float]
+
+    def __init__(self) -> None:
+        self.state = "IDLE"
+        self.target_shooter_angle = 0.0
+        self.indexer_voltage = 0.0
+        self.target_shooter_speed = 0.0
+        
+        self.tuning_sendables_sent = False
+        
+        super().__init__()
