@@ -418,6 +418,7 @@ class Drivetrain:
         )
 
         self.io.actual_speed = self.kinematics.toChassisSpeeds(self.get_module_states())
+        self.io.acual_speed_str = get_struct_string(self.io.actual_speed)
 
         self.io.last_module_positions = self.get_module_positions()
 

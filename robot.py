@@ -53,7 +53,7 @@ class MyRobot(MagicRobot):
 
         swerve_config = SwerveConfig(
             drive_ratio=1 / 7.7142857,
-            steer_ratio=1 / 7.7142857,
+            steer_ratio=1 / 7.7142857 if self.isReal() else 1/25.9,
             steer_pid_constants=PIDConstants(3.7, 0, 0.05),
             drive_pid_constants=PIDConstants(0.5, 0, 0),
             ff_constants=FFConstants(0.2278, 2.4176, 0),

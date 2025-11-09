@@ -74,6 +74,7 @@ class DrivetrainIO(IO):
 
         # The speed that the robot is actually driving at
         self.actual_speed = ChassisSpeeds()
+        self.acual_speed_str = ""
 
         self.pose_str = ""
         self.odometery_pose = Pose2d()
