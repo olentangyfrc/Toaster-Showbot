@@ -6,10 +6,10 @@ from typing import Any, ClassVar, NamedTuple, Optional, Protocol, runtime_checka
 
 import wpimath
 import wpimath.units as units
+from wpimath.controller import PIDController, ProfiledPIDController
+from wpimath.filter import SlewRateLimiter
 from wpimath.geometry import Pose2d, Rotation2d, Translation2d
 from wpimath.kinematics import ChassisSpeeds
-from wpimath.controller import ProfiledPIDController, PIDController
-from wpimath.filter import SlewRateLimiter
 
 
 class PIDConstants(NamedTuple):
@@ -24,6 +24,7 @@ class FFConstants(NamedTuple):
     """
     Parameters: kS, kV, kA, kG
     """
+
     kS: float = 0
     kV: float = 0
     kA: float = 0
@@ -92,7 +93,8 @@ class Struct(Protocol):
     def __repr__(self) -> str:  # All objects should have this, but just to make sure
         ...
 
-class SimplePControllerSim():
+
+class SimplePControllerSim:
     def __init__(
         self,
         controller: PIDController | ProfiledPIDController,
@@ -119,7 +121,7 @@ class SimplePControllerSim():
     @value.setter
     def value(self, new_val: float) -> None:
         raise ValueError("Do not set value manually, instead allow it to be calculated")
-    
+
     def at_goal(self) -> bool:
         self._goal = (
             self.controller.getGoal().position
@@ -136,7 +138,7 @@ class SimplePControllerSim():
         if not self.at_goal():
             # It's a really dumbed down algorithm, but it gets the job done well enough.
             # Probably should change to using actual sim systems after a while though.
-            
+
             intermediate = self._value
             intermediate += (self._goal - self._value) / self.controller.getP()
             self._value = (
@@ -144,6 +146,7 @@ class SimplePControllerSim():
                 if self.limiter is not None
                 else intermediate
             )
+
 
 FREE_SPEED_LOOKUP = {
     MotorTypes.KRAKEN_X60: 6000 / 60,

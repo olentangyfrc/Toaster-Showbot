@@ -18,10 +18,15 @@ from wpimath.kinematics import ChassisSpeeds
 from components.climber import Climber
 from components.drivetrain import DriveSignal, Drivetrain
 from components.intake import Intake, IntakeStates
-from components.shooter import Shooter, ShooterStates
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
+from components.shooter import Shooter
 from utilities import helpers as utils
-from utilities.configs import DrivetrainConfig, IntakeConfig, SwerveConfig, ShooterConfig
+from utilities.configs import (
+    DrivetrainConfig,
+    IntakeConfig,
+    ShooterConfig,
+    SwerveConfig,
+)
 from utilities.elasticlib import Notification, NotificationLevel, NotificationManager
 from utilities.helpers import FFConstants, MotorTypes, PIDConstants, ProfileConstants
 from utilities.IO_helpers import IO
@@ -98,23 +103,26 @@ class MyRobot(MagicRobot):
         )
 
         self.shooter_config = ShooterConfig(
-            indexer_id = 47,
-            beam_bread_id = 1,
-            pivot_motor_id = 35,
-            bottom_shoot_motor_id = 36,
-            top_shoot_motor_id = 37,
-            shooter_speed_ff = FFConstants(0.0851881, 0.15583),
-            shooter_gear_ratio = 12/15,
-            pivot_abs_encoder_id = 0,
-            pivot_pid = PIDConstants(20, 5, 0),
-            pivot_profile_constraints = ProfileConstants(9999, 1000), #TODO: probably implement these
-            pivot_ff = FFConstants(0, 0.03, 0, 0),
-            pivot_gear_ratio = 1/108,
-            CANbus = self.CANbus,
+            indexer_id=47,
+            beam_break_id=1,
+            pivot_motor_id=35,
+            bottom_flywheel_motor_id=36,
+            top_flywheel_motor_id=37,
+            shooter_speed_ff=FFConstants(0.0851881, 0.15583),
+            shooter_gear_ratio=12 / 15,
+            pivot_abs_encoder_id=0,
+            pivot_pid=PIDConstants(20, 5, 0),
+            pivot_profile_constraints=ProfileConstants(
+                9999, 1000
+            ),  # TODO: probably implement these
+            pivot_ff=FFConstants(0, 0.03, 0, 0),
+            pivot_gear_ratio=1 / 108,
+            CANbus=self.CANbus,
         )
 
         self.mech = Mechanism2d(4, 4, Color8Bit(255, 255, 255))
         self.intake_mech_root = self.mech.getRoot("Intake", 0, 1.5)
+        self.shooter_mech_root = self.mech.getRoot("Shooter", 0, 3)
 
         SmartDashboard.putData("Mechanism", self.mech)
 

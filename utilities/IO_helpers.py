@@ -117,7 +117,7 @@ class IO:
     _adding_index = 0  # Index for adding new publishers
     _selection_index = 0  # Index for sending publishers
 
-    MAX_LIST_SIZE = 40
+    MAX_LIST_SIZE = 20
 
     # Add to this to track more things for each type
     DEVICE_CALLABLES: dict[ParentDevice, tuple[Callable[[], StatusSignal], ...]] = {

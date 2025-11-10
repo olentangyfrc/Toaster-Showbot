@@ -19,8 +19,6 @@ from wpilib.simulation import (
     RoboRioSim,
     SingleJointedArmSim,
 )
-from wpimath.controller import PIDController, ProfiledPIDController
-from wpimath.filter import SlewRateLimiter
 from wpimath.system.plant import DCMotor, LinearSystemId
 
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
