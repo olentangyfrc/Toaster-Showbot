@@ -19,7 +19,7 @@ from components.climber import Climber
 from components.drivetrain import DriveSignal, Drivetrain
 from components.intake import Intake, IntakeStates
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
-from components.shooter import Shooter
+from components.shooter import Shooter, ShooterStates
 from utilities import helpers as utils
 from utilities.configs import (
     DrivetrainConfig,
@@ -108,7 +108,7 @@ class MyRobot(MagicRobot):
             pivot_motor_id=35,
             bottom_flywheel_motor_id=36,
             top_flywheel_motor_id=37,
-            shooter_speed_ff=FFConstants(0.0851881, 0.15583),
+            shooter_speed_ff=FFConstants(0.0862775, 0.113191/4, 0, 0),
             shooter_gear_ratio=12 / 15,
             pivot_abs_encoder_id=0,
             pivot_pid=PIDConstants(20, 5, 0),
@@ -161,8 +161,18 @@ class MyRobot(MagicRobot):
             and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
         ):
             self.intake.grab_note()
-        elif self.intake.state == IntakeStates.DEPLOYED:
+        elif (self.intake.state == IntakeStates.DEPLOYED or self.shooter.state == ShooterStates.HOLDING) and not self.intake.has_note():
             self.intake.go_to_idle()
+        elif self.intake.state in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
+            self.shooter.feed()
+        
+        if (
+            self.controller.getLeftTriggerAxis() > 0.2 and
+            self.shooter.state == ShooterStates.HOLDING and
+            self.shooter.has_note()
+        ):
+            self.shooter.shoot()
+
 
         if self.controller.getLeftBumperPressed():
             self.climber.set_manual_voltage(-2)

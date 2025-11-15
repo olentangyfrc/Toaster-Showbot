@@ -29,22 +29,22 @@ from utilities.configs import ShooterConfig
 from utilities.helpers import SimplePControllerSim, clamp
 from utilities.IO import ShooterIO
 
-FEED_DELAY = 0
-FEEDING_ANGLE = 3
+FEED_DELAY = 0.15
+FEEDING_ANGLE = math.radians(3)
 
 
 INDEXER_FEED_VOLTAGE = -0.25 * 12
 INDEXER_SHOOTING_VOLTAGE = -0.25 * 12
-SHOOTER_SHOOTING_SPEED = 20
+SHOOTER_SHOOTING_SPEED = 150
 
 
-SUBWOOFER_SHOOTING_ANGLE = math.radians(47)
+SUBWOOFER_SHOOTING_ANGLE = math.radians(40)
 HOLDING_ANGLE = math.radians(25)
 
 MIN_SHOOTER_ANGLE = math.radians(-7)
 MAX_SHOOTER_ANGLE = math.radians(43)
 
-MAX_SHOOTER_SPEED = 80
+MAX_SHOOTER_SPEED = 250 # Closer to 300 on actual robot bc bad ff tuning
 
 ABS_ENCODER_OFFSET = 0.176  # Position absolute encoder reads when held horizontally
 
@@ -60,6 +60,7 @@ class ShooterStates(Enum):
 
 class Shooter:
     manual_tuning_mode = tunable(False)
+    manual_flywheel_speed = tunable(0.0)
 
     def __init__(self, config: ShooterConfig, mech_root: MechanismRoot2d):
         self.beam_break = DigitalInput(config.beam_break_id)
@@ -261,6 +262,7 @@ class Shooter:
                 self.io.flywheel_voltage
             ).with_enable_foc(False)
         )
+        self.indexer.setVoltage(self.io.indexer_voltage)
 
     def _handle_state_logic(self) -> None:
         if self.manual_tuning_mode and not self.io.tuning_sendables_sent:
@@ -269,7 +271,7 @@ class Shooter:
 
         if self.manual_tuning_mode:
             self.io.target_shooter_angle = self.pivot_pid.getGoal().position
-            self.io.target_flywheel_speed = 0
+            self.io.target_flywheel_speed = self.manual_flywheel_speed
             self.io.indexer_voltage = 0
             self.io.state = "Manual Tuning"
             return
@@ -290,12 +292,12 @@ class Shooter:
                 if self.has_note():
                     if math.isnan(self.feed_start_time):
                         self.feed_start_time = self.shoot_timer.getFPGATimestamp()
-                elif (
-                    self.shoot_timer.getFPGATimestamp() - self.feed_start_time
-                    >= FEED_DELAY
-                ):
-                    self.state = ShooterStates.HOLDING
-                    self.io.indexer_voltage = 0
+                    elif (
+                        self.shoot_timer.getFPGATimestamp() - self.feed_start_time
+                        >= FEED_DELAY
+                    ):
+                        self.state = ShooterStates.HOLDING
+                        self.io.indexer_voltage = 0
 
             case ShooterStates.HOLDING:
                 self.io.target_shooter_angle = HOLDING_ANGLE
