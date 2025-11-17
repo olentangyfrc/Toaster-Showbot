@@ -333,7 +333,7 @@ class Shooter:
 
                 if math.isnan(self.shot_start_time):
                     self.shot_start_time = self.shoot_timer.getFPGATimestamp()
-                elif self.shoot_timer.getFPGATimestamp() - self.shot_start_time >= 1.2:
+                elif self.shoot_timer.getFPGATimestamp() - self.shot_start_time >= 1.2: #TODO Check if we should replace this with 'not self.has_note()'
                     self.state = ShooterStates.IDLE
                     self.shot_start_time = float("nan")
 

@@ -225,6 +225,10 @@ class MyRobot(MagicRobot):
         )
 
     def cancel_all(self) -> None: 
-        if (not self.intake.has_note()) and (not self.shooter.has_note()): 
+        if self.intake.has_note(): 
+            self.intake.eject()
+        elif self.shooter.has_note():
+            self.shooter.eject()
+        else: 
             self.intake.go_to_idle()
             self.shooter.go_to_idle()

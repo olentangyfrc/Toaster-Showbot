@@ -181,7 +181,7 @@ class Intake:
                 self.io.target_pivot_position = math.radians(94)
 
             case IntakeStates.EJECT:
-                self.io.target_roller_voltage = 4
+                self.io.target_roller_voltage = -2 # Check pos and speed
                 self.io.target_pivot_position = math.radians(45)
 
             case IntakeStates.DEPLOYED:
