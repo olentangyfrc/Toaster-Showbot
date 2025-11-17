@@ -19,8 +19,14 @@ from components.climber import Climber
 from components.drivetrain import DriveSignal, Drivetrain
 from components.intake import Intake, IntakeStates
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
+from components.shooter import Shooter, ShooterStates
 from utilities import helpers as utils
-from utilities.configs import DrivetrainConfig, IntakeConfig, SwerveConfig
+from utilities.configs import (
+    DrivetrainConfig,
+    IntakeConfig,
+    ShooterConfig,
+    SwerveConfig,
+)
 from utilities.elasticlib import Notification, NotificationLevel, NotificationManager
 from utilities.helpers import FFConstants, MotorTypes, PIDConstants, ProfileConstants
 from utilities.IO_helpers import IO
@@ -30,6 +36,7 @@ class MyRobot(MagicRobot):
     drivetrain: Drivetrain
     climber: Climber
     intake: Intake
+    shooter: Shooter
 
     def createObjects(self) -> None:
         DataLogManager.start()
@@ -95,8 +102,27 @@ class MyRobot(MagicRobot):
             CANbus=self.CANbus,
         )
 
+        self.shooter_config = ShooterConfig(
+            indexer_id=47,
+            beam_break_id=1,
+            pivot_motor_id=35,
+            bottom_flywheel_motor_id=36,
+            top_flywheel_motor_id=37,
+            shooter_speed_ff=FFConstants(0.0862775, 0.113191/4, 0, 0),
+            shooter_gear_ratio=12 / 15,
+            pivot_abs_encoder_id=0,
+            pivot_pid=PIDConstants(20, 5, 0),
+            pivot_profile_constraints=ProfileConstants(
+                9999, 1000
+            ),  # TODO: probably implement these
+            pivot_ff=FFConstants(0, 0.03, 0, 0),
+            pivot_gear_ratio=1 / 108,
+            CANbus=self.CANbus,
+        )
+
         self.mech = Mechanism2d(4, 4, Color8Bit(255, 255, 255))
         self.intake_mech_root = self.mech.getRoot("Intake", 0, 1.5)
+        self.shooter_mech_root = self.mech.getRoot("Shooter", 0, 3)
 
         SmartDashboard.putData("Mechanism", self.mech)
 
@@ -135,8 +161,18 @@ class MyRobot(MagicRobot):
             and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
         ):
             self.intake.grab_note()
-        elif self.intake.state == IntakeStates.DEPLOYED:
+        elif (self.intake.state == IntakeStates.DEPLOYED or self.shooter.state == ShooterStates.HOLDING) and not self.intake.has_note():
             self.intake.go_to_idle()
+        elif self.intake.state in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
+            self.shooter.feed()
+        
+        if (
+            self.controller.getLeftTriggerAxis() > 0.2 and
+            self.shooter.state == ShooterStates.HOLDING and
+            self.shooter.has_note()
+        ):
+            self.shooter.shoot()
+
 
         if self.controller.getLeftBumperPressed():
             self.climber.set_manual_voltage(-2)

@@ -14,9 +14,8 @@ from wpimath.controller import ArmFeedforward, ProfiledPIDController
 from wpimath.filter import SlewRateLimiter
 from wpimath.trajectory import TrapezoidProfile
 
-from physics import SimplePControllerSim
 from utilities.configs import IntakeConfig
-from utilities.helpers import clamp
+from utilities.helpers import SimplePControllerSim, clamp
 from utilities.IO import IntakeIO
 
 ZERO_POSITION = math.radians(96.843)
@@ -35,6 +34,7 @@ class IntakeStates(Enum):
 
 
 class Intake:
+
     manual_tuning_mode = tunable(False)
 
     def __init__(self, config: IntakeConfig, mech_root: MechanismRoot2d) -> None:
@@ -192,7 +192,7 @@ class Intake:
                     self.state = IntakeStates.RETRACTING
 
             case IntakeStates.FEEDING:
-                self.io.target_roller_voltage = 0
+                self.io.target_roller_voltage = 2
                 self.io.target_pivot_position = math.radians(90)
 
             case IntakeStates.RETRACTING:
