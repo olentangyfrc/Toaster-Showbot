@@ -144,20 +144,16 @@ class MyRobot(MagicRobot):
         elif self.drivetrain.is_motion_limited():
             self.drivetrain.disable_motion_limiting()
 
-        if self.controller.getAButtonPressed():
-            self.drivetrain.go_to_pose(Pose2d(2, 3, Rotation2d.fromDegrees(180)))
-        elif self.controller.getBButtonPressed():
-            self.drivetrain.go_to_pose(Pose2d(1, 2, Rotation2d.fromDegrees(180)))
-
         if self.controller.getYButtonPressed():
             self.drivetrain.gyro.set_yaw(0)
 
-        if self.controller.getStartButton() and not self.intake.has_note():
-            self.intake.go_to_idle()
+        if self.controller.getStartButton():
+            self.cancel_all()
 
         if (
             self.controller.getRightTriggerAxis() > 0.2
             and not self.intake.has_note()
+            and not self.shooter.has_note()
             and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
         ):
             self.intake.grab_note()
@@ -173,9 +169,6 @@ class MyRobot(MagicRobot):
         ):
             self.shooter.shoot()
 
-
-        if self.controller.getLeftBumperPressed():
-            self.climber.set_manual_voltage(-2)
 
     def robotPeriodic(self) -> None:
         # Stops unimportant notifications during comp
@@ -231,3 +224,7 @@ class MyRobot(MagicRobot):
             ),
             lambda: RobotController.isBrownedOut(),
         )
+
+    def cancel_all(self) -> None: 
+        self.intake.eject()
+        self.shooter.eject()

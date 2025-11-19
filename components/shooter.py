@@ -17,6 +17,7 @@ from wpilib import (
     MechanismRoot2d,
     RobotBase,
     SmartDashboard,
+    Timer,
 )
 from wpimath.controller import (
     ArmFeedforward,
@@ -29,11 +30,11 @@ from utilities.configs import ShooterConfig
 from utilities.helpers import SimplePControllerSim, clamp
 from utilities.IO import ShooterIO
 
-FEED_DELAY = 0.15
-FEEDING_ANGLE = math.radians(3)
+FEED_DELAY = 0.06
+FEEDING_ANGLE = math.radians(0)
 
 
-INDEXER_FEED_VOLTAGE = -0.25 * 12
+INDEXER_FEED_VOLTAGE = -0.5 * 12
 INDEXER_SHOOTING_VOLTAGE = -0.25 * 12
 SHOOTER_SHOOTING_SPEED = 150
 
@@ -126,9 +127,7 @@ class Shooter:
 
         self._state = ShooterStates.IDLE
 
-        self.shot_start_time = float("nan")
-        self.feed_start_time = float("nan")
-        self.shoot_timer = wpilib.Timer()
+        self.timer = Timer()
 
         self.pivot_voltage_request = VoltageOut(0.0)
         self.flywheel_voltage_request = VoltageOut(0.0)
@@ -290,14 +289,14 @@ class Shooter:
                 self.io.target_flywheel_speed = 0
 
                 if self.has_note():
-                    if math.isnan(self.feed_start_time):
-                        self.feed_start_time = self.shoot_timer.getFPGATimestamp()
+                    if not self.timer.isRunning():
+                        self.timer.restart()
                     elif (
-                        self.shoot_timer.getFPGATimestamp() - self.feed_start_time
-                        >= FEED_DELAY
+                        self.timer.get() >= FEED_DELAY
                     ):
                         self.state = ShooterStates.HOLDING
                         self.io.indexer_voltage = 0
+                        self.timer.stop()
 
             case ShooterStates.HOLDING:
                 self.io.target_shooter_angle = HOLDING_ANGLE
@@ -315,12 +314,9 @@ class Shooter:
                 self.io.target_shooter_angle = SUBWOOFER_SHOOTING_ANGLE
                 self.io.target_flywheel_speed = SHOOTER_SHOOTING_SPEED
                 self.io.indexer_voltage = INDEXER_SHOOTING_VOLTAGE
-
-                if math.isnan(self.shot_start_time):
-                    self.shot_start_time = self.shoot_timer.getFPGATimestamp()
-                elif not self.has_note():
+            
+                if not self.has_note():
                     self.state = ShooterStates.IDLE
-                    self.shot_start_time = float("nan")
 
             case ShooterStates.EJECT:
                 self.io.target_shooter_angle = 0
@@ -331,11 +327,11 @@ class Shooter:
                 else:
                     self.io.indexer_voltage = 0
 
-                if math.isnan(self.shot_start_time):
-                    self.shot_start_time = self.shoot_timer.getFPGATimestamp()
-                elif self.shoot_timer.getFPGATimestamp() - self.shot_start_time >= 1.2:
+                if not self.timer.isRunning():
+                    self.timer.restart()
+                elif self.timer.get() >= 1.2:
                     self.state = ShooterStates.IDLE
-                    self.shot_start_time = float("nan")
+                    self.timer.stop()
 
     def _set_up_logging(self) -> None:
         self.io.pivot_angle_supplier = self.pivot_motor.get_position()
