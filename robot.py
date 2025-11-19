@@ -153,6 +153,7 @@ class MyRobot(MagicRobot):
         if (
             self.controller.getRightTriggerAxis() > 0.2
             and not self.intake.has_note()
+            and not self.shooter.has_note()
             and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
         ):
             self.intake.grab_note()
@@ -225,10 +226,5 @@ class MyRobot(MagicRobot):
         )
 
     def cancel_all(self) -> None: 
-        if self.intake.has_note(): 
-            self.intake.eject()
-        elif self.shooter.has_note():
-            self.shooter.eject()
-        else: 
-            self.intake.go_to_idle()
-            self.shooter.go_to_idle()
+        self.intake.eject()
+        self.shooter.eject()

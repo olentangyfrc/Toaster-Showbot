@@ -180,9 +180,16 @@ class Intake:
                 self.io.target_roller_voltage = 0
                 self.io.target_pivot_position = math.radians(94)
 
+
             case IntakeStates.EJECT:
                 self.io.target_roller_voltage = -2 # Check pos and speed
                 self.io.target_pivot_position = math.radians(45)
+
+                if not self.intake_timer.isRunning():
+                    self.intake_timer.restart()
+                if self.intake_timer.get() > 0.5:
+                    self.state = IntakeStates.IDLE
+                    self.intake_timer.stop()
 
             case IntakeStates.DEPLOYED:
                 self.io.target_roller_voltage = 2
@@ -193,11 +200,11 @@ class Intake:
 
             case IntakeStates.FEEDING:
                 self.io.target_roller_voltage = 2
-                self.io.target_pivot_position = math.radians(90)
+                self.io.target_pivot_position = math.radians(95.5)
 
             case IntakeStates.RETRACTING:
                 self.io.target_roller_voltage = 0.2
-                self.io.target_pivot_position = math.radians(90)
+                self.io.target_pivot_position = math.radians(95.5)
 
                 if self.at_target_position():
                     self.state = IntakeStates.FEEDING

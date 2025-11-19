@@ -29,11 +29,11 @@ from utilities.configs import ShooterConfig
 from utilities.helpers import SimplePControllerSim, clamp
 from utilities.IO import ShooterIO
 
-FEED_DELAY = 0.15
-FEEDING_ANGLE = math.radians(3)
+FEED_DELAY = 0.07
+FEEDING_ANGLE = math.radians(0)
 
 
-INDEXER_FEED_VOLTAGE = -0.25 * 12
+INDEXER_FEED_VOLTAGE = -0.5 * 12
 INDEXER_SHOOTING_VOLTAGE = -0.25 * 12
 SHOOTER_SHOOTING_SPEED = 150
 
@@ -129,6 +129,7 @@ class Shooter:
         self.shot_start_time = float("nan")
         self.feed_start_time = float("nan")
         self.shoot_timer = wpilib.Timer()
+        self.feed_timer = wpilib.Timer()
 
         self.pivot_voltage_request = VoltageOut(0.0)
         self.flywheel_voltage_request = VoltageOut(0.0)
@@ -291,13 +292,14 @@ class Shooter:
 
                 if self.has_note():
                     if math.isnan(self.feed_start_time):
-                        self.feed_start_time = self.shoot_timer.getFPGATimestamp()
+                        self.feed_start_time = self.feed_timer.getFPGATimestamp()
                     elif (
-                        self.shoot_timer.getFPGATimestamp() - self.feed_start_time
+                        self.feed_timer.getFPGATimestamp() - self.feed_start_time
                         >= FEED_DELAY
                     ):
                         self.state = ShooterStates.HOLDING
                         self.io.indexer_voltage = 0
+                        self.feed_start_time = float("nan")
 
             case ShooterStates.HOLDING:
                 self.io.target_shooter_angle = HOLDING_ANGLE
