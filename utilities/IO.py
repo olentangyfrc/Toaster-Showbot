@@ -165,7 +165,8 @@ class IntakeIO(IO):
             "pivot_position_supplier",
             "pivot_velocity_supplier",
             "tuning_sendables_sent",
-        }
+        },
+        insert_class_name=True,
     )
 
     pivot_position_supplier: StatusSignal[float]
@@ -189,8 +190,10 @@ class ShooterIO(IO):
             "shooter_angle_velocity_supplier",
             "shooter_velocity_supplier",
             "tuning_sendables_sent",
+            "continue_to_shoot",
         },
         modifiers={"target_shooter_angle": math.degrees},
+        insert_class_name=True,
     )
 
     pivot_angle_supplier: StatusSignal[float]
@@ -207,5 +210,6 @@ class ShooterIO(IO):
         self.indexer_voltage = 0.0
 
         self.tuning_sendables_sent = False
+        self.continue_to_shoot = False
 
         super().__init__()

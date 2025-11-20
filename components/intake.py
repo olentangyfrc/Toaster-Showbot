@@ -34,7 +34,6 @@ class IntakeStates(Enum):
 
 
 class Intake:
-
     manual_tuning_mode = tunable(False)
 
     def __init__(self, config: IntakeConfig, mech_root: MechanismRoot2d) -> None:
@@ -180,9 +179,8 @@ class Intake:
                 self.io.target_roller_voltage = 0
                 self.io.target_pivot_position = math.radians(94)
 
-
             case IntakeStates.EJECT:
-                self.io.target_roller_voltage = -2 # Check pos and speed
+                self.io.target_roller_voltage = -2  # Check pos and speed
                 self.io.target_pivot_position = math.radians(45)
 
                 if not self.intake_timer.isRunning():

@@ -12,7 +12,6 @@ from wpilib import (
     XboxController,
 )
 from wpilib.deployinfo import getDeployData
-from wpimath.geometry import Pose2d, Rotation2d
 from wpimath.kinematics import ChassisSpeeds
 
 from components.climber import Climber
@@ -60,7 +59,7 @@ class MyRobot(MagicRobot):
 
         swerve_config = SwerveConfig(
             drive_ratio=1 / 7.7142857,
-            steer_ratio=1 / 7.7142857 if self.isReal() else 1/25.9,
+            steer_ratio=1 / 7.7142857 if self.isReal() else 1 / 25.9,
             steer_pid_constants=PIDConstants(3.7, 0, 0.05),
             drive_pid_constants=PIDConstants(0.5, 0, 0),
             ff_constants=FFConstants(0.2278, 2.4176, 0),
@@ -108,7 +107,7 @@ class MyRobot(MagicRobot):
             pivot_motor_id=35,
             bottom_flywheel_motor_id=36,
             top_flywheel_motor_id=37,
-            shooter_speed_ff=FFConstants(0.0862775, 0.113191/4, 0, 0),
+            shooter_speed_ff=FFConstants(0.0862775, 0.113191 / 4, 0, 0),
             shooter_gear_ratio=12 / 15,
             pivot_abs_encoder_id=0,
             pivot_pid=PIDConstants(20, 5, 0),
@@ -157,18 +156,30 @@ class MyRobot(MagicRobot):
             and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
         ):
             self.intake.grab_note()
-        elif (self.intake.state == IntakeStates.DEPLOYED or self.shooter.state == ShooterStates.HOLDING) and not self.intake.has_note():
+        elif (
+            self.intake.state == IntakeStates.DEPLOYED
+            or self.shooter.state == ShooterStates.HOLDING
+        ) and not self.intake.has_note():
             self.intake.go_to_idle()
         elif self.intake.state in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
             self.shooter.feed()
-        
-        if (
-            self.controller.getLeftTriggerAxis() > 0.2 and
-            self.shooter.state == ShooterStates.HOLDING and
-            self.shooter.has_note()
-        ):
-            self.shooter.shoot()
 
+        if self.shooter.has_note():
+            if self.shooter.state != ShooterStates.SHOOTING:
+                if self.controller.getPOV() == 0:
+                    self.shooter.aim(5)
+                elif self.controller.getPOV() == 90:
+                    self.shooter.aim(15)
+                elif self.controller.getPOV() == 90:
+                    self.shooter.aim(25)
+                elif self.controller.getPOV() == 90:
+                    self.shooter.aim(35)
+
+            if self.controller.getLeftTriggerAxis() > 0.2:
+                if self.shooter.state == ShooterStates.HOLDING: # Direct shot, no preaiming
+                    self.shooter.aim(40, True)
+                elif self.shooter.state == ShooterStates.AIMING:
+                    self.shooter.shoot()
 
     def robotPeriodic(self) -> None:
         # Stops unimportant notifications during comp
@@ -225,6 +236,6 @@ class MyRobot(MagicRobot):
             lambda: RobotController.isBrownedOut(),
         )
 
-    def cancel_all(self) -> None: 
+    def cancel_all(self) -> None:
         self.intake.eject()
         self.shooter.eject()

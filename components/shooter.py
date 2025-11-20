@@ -1,7 +1,6 @@
 import math
 from enum import Enum
 
-import wpilib
 import wpimath.units as units
 from magicbot import tunable
 from phoenix6 import BaseStatusSignal
@@ -45,7 +44,7 @@ HOLDING_ANGLE = math.radians(25)
 MIN_SHOOTER_ANGLE = math.radians(-7)
 MAX_SHOOTER_ANGLE = math.radians(43)
 
-MAX_SHOOTER_SPEED = 250 # Closer to 300 on actual robot bc bad ff tuning
+MAX_SHOOTER_SPEED = 250  # Closer to 300 on actual robot bc bad ff tuning
 
 ABS_ENCODER_OFFSET = 0.176  # Position absolute encoder reads when held horizontally
 
@@ -161,8 +160,14 @@ class Shooter:
     def go_to_idle(self) -> None:
         self.state = ShooterStates.IDLE
 
-    def shoot(self) -> None:
+    def aim(self, angle: units.degrees = 40, continue_to_shoot=False) -> None:
+        self.io.target_shooter_angle = math.radians(angle)
         self.state = ShooterStates.AIMING
+
+        self.io.continue_to_shoot = continue_to_shoot
+
+    def shoot(self) -> None:
+        self.state = ShooterStates.SHOOTING
 
     def feed(self) -> None:
         self.state = ShooterStates.FEEDING
@@ -291,9 +296,7 @@ class Shooter:
                 if self.has_note():
                     if not self.timer.isRunning():
                         self.timer.restart()
-                    elif (
-                        self.timer.get() >= FEED_DELAY
-                    ):
+                    elif self.timer.get() >= FEED_DELAY:
                         self.state = ShooterStates.HOLDING
                         self.io.indexer_voltage = 0
                         self.timer.stop()
@@ -304,19 +307,20 @@ class Shooter:
                 self.io.target_flywheel_speed = 0
 
             case ShooterStates.AIMING:
-                self.io.target_shooter_angle = SUBWOOFER_SHOOTING_ANGLE
                 self.io.indexer_voltage = 0
-                self.io.target_flywheel_speed = SHOOTER_SHOOTING_SPEED
-                if self.at_target_position() and self.at_target_speed():
+                self.io.target_flywheel_speed = 0
+
+                if self.at_target_position() and self.io.continue_to_shoot:
                     self.state = ShooterStates.SHOOTING
 
             case ShooterStates.SHOOTING:
-                self.io.target_shooter_angle = SUBWOOFER_SHOOTING_ANGLE
                 self.io.target_flywheel_speed = SHOOTER_SHOOTING_SPEED
-                self.io.indexer_voltage = INDEXER_SHOOTING_VOLTAGE
-            
-                if not self.has_note():
-                    self.state = ShooterStates.IDLE
+
+                if self.at_target_speed():
+                    self.io.indexer_voltage = INDEXER_SHOOTING_VOLTAGE
+
+                    if not self.has_note():
+                        self.state = ShooterStates.IDLE
 
             case ShooterStates.EJECT:
                 self.io.target_shooter_angle = 0

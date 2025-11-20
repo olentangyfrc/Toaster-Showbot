@@ -56,7 +56,8 @@ class PublisherSpecifications:
     container: str | None = None
     ignore_fields: set = field(default_factory=set)
     high_resolution: set = field(default_factory=set)
-    rename: bool | None = True
+    rename: bool = True
+    insert_class_name: bool = False
 
 
 def auto_log(cls):
@@ -708,6 +709,9 @@ def _create_publishers_for_static_annotations(
             clean_name, name, specifications_dict=specifications.modifiers
         )  # No real way to check types here
 
+        if specifications.insert_class_name:
+            clean_name = cls.__name__.removesuffix("IO") + " " + clean_name
+
         if any(
             check_name((name, clean_name), provided=field)
             for field in specifications.ignore_fields
@@ -798,6 +802,9 @@ def _create_publishers_from_class(
         if modifier:
             val = modifier(val)
 
+        if specifications.insert_class_name:
+            clean_name = type(cls).__name__.removesuffix("IO") + " " + clean_name
+
         publisher = _create_publisher_for_type(
             val, extra_instance or nt_instance, clean_name
         )
@@ -871,6 +878,9 @@ def _create_publisher_from_function(
             f"Field {func.__name__} in {type(cls).__name__} is ignored. Skipping over logging it."
         )
         return
+
+    if specifications.insert_class_name:
+        func_name = type(cls).__name__.removesuffix("IO") + " " + func_name
 
     publisher = _create_publisher_for_type(rtype, nt_instance, func_name)
     return PublisherInfo(func, None, publisher.set, modifier, None, cls)
