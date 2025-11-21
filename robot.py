@@ -176,7 +176,9 @@ class MyRobot(MagicRobot):
                     self.shooter.aim(35)
 
             if self.controller.getLeftTriggerAxis() > 0.2:
-                if self.shooter.state == ShooterStates.HOLDING: # Direct shot, no preaiming
+                if (
+                    self.shooter.state == ShooterStates.HOLDING
+                ):  # Direct shot, no preaiming
                     self.shooter.aim(40, True)
                 elif self.shooter.state == ShooterStates.AIMING:
                     self.shooter.shoot()

@@ -54,7 +54,7 @@ class PublisherSpecifications:
     modifiers: dict[AnyAmountStr, Callable[[Any], Any]] = field(default_factory=dict)
     conditions: dict[AnyAmountStr, Callable[[], bool]] = field(default_factory=dict)
     container: str | None = None
-    ignore_fields: set [str]= field(default_factory=set)
+    ignore_fields: set[str] = field(default_factory=set)
     high_resolution: set[str] = field(default_factory=set)
     rename: bool = True
     insert_class_name: set[str] = field(default_factory=set)
@@ -624,7 +624,9 @@ def check_name(names: str | Iterable[str], provided: str) -> bool:
     if isinstance(names, str):
         names = [names]
 
-    return any(name == provided or _register_wildcards(name, provided) for name in names)
+    return any(
+        name == provided or _register_wildcards(name, provided) for name in names
+    )
 
 
 def _get_dict_value_from_specifications(
@@ -709,7 +711,10 @@ def _create_publishers_for_static_annotations(
             clean_name, name, specifications_dict=specifications.modifiers
         )  # No real way to check types here
 
-        if name in specifications.insert_class_name or clean_name in specifications.insert_class_name:
+        if (
+            name in specifications.insert_class_name
+            or clean_name in specifications.insert_class_name
+        ):
             clean_name = cls.__name__.removesuffix("IO") + " " + clean_name
 
         if any(
@@ -802,7 +807,10 @@ def _create_publishers_from_class(
         if modifier:
             val = modifier(val)
 
-        if name in specifications.insert_class_name or clean_name in specifications.insert_class_name:
+        if (
+            name in specifications.insert_class_name
+            or clean_name in specifications.insert_class_name
+        ):
             clean_name = type(cls).__name__.removesuffix("IO") + " " + clean_name
 
         publisher = _create_publisher_for_type(
@@ -879,7 +887,10 @@ def _create_publisher_from_function(
         )
         return
 
-    if clean_name in specifications.insert_class_name or func.__name__ in specifications.insert_class_name:
+    if (
+        clean_name in specifications.insert_class_name
+        or func.__name__ in specifications.insert_class_name
+    ):
         clean_name = type(cls).__name__.removesuffix("IO") + " " + clean_name
 
     publisher = _create_publisher_for_type(rtype, nt_instance, clean_name)
