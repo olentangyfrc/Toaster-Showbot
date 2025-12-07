@@ -63,6 +63,7 @@ class DrivetrainIO(IO):
         },
         high_resolution={"pose*", "sample*", "*module_states"},
         modifiers={"target_rotation": lambda _: _.degrees() % 360},
+        insert_class_name={"state"},
     )
 
     gyro_yaw_supplier: StatusSignal[float]
@@ -76,7 +77,7 @@ class DrivetrainIO(IO):
 
         # The speed that the robot is actually driving at
         self.actual_speed = ChassisSpeeds()
-        self.acual_speed_str = ""
+        self.actual_speed_str = ""
 
         self.pose_str = ""
         self.odometery_pose = Pose2d()
@@ -163,18 +164,26 @@ class IntakeIO(IO):
     SPECIFICATIONS = PublisherSpecifications(
         ignore_fields={
             "pivot_position_supplier",
-            "pivot_velocity_supplier",
             "tuning_sendables_sent",
-        }
+        },
+        insert_class_name={
+            "state",
+            "get_pivot_angle",
+            "at_target_position",
+            "target_pivot_angle",
+            "pivot_voltage",
+            "has_note",
+        },
     )
 
     pivot_position_supplier: StatusSignal[float]
-    pivot_velocity_supplier: StatusSignal[float]
 
     def __init__(self) -> None:
         self.state = "IDLE"
-        self.target_pivot_position = 0.0
-        self.target_roller_voltage = 0.0
+        self.target_pivot_angle = 0.0
+
+        self.roller_voltage = 0.0
+        self.pivot_voltage = 0.0
 
         self.tuning_sendables_sent = False
 
@@ -185,21 +194,29 @@ class IntakeIO(IO):
 class ShooterIO(IO):
     SPECIFICATIONS = PublisherSpecifications(
         ignore_fields={
-            "shooter_angle_supplier",  # TODO: Verify if I did this correctly
-            "shooter_angle_velocity_supplier",
-            "shooter_velocity_supplier",
+            "pivot_position_supplier",  # TODO: Verify if I did this correctly
+            "flywheel_velocity_supplier",
             "tuning_sendables_sent",
+            "continue_to_shoot",
         },
         modifiers={"target_shooter_angle": math.degrees},
+        insert_class_name={
+            "state",
+            "has_note",
+            "at_target_position",
+            "at_target_speed",
+            "get_pivot_angle",
+            "target_pivot_angle",
+            "pivot_voltage",
+        },
     )
 
-    pivot_angle_supplier: StatusSignal[float]
-    pivot_angular_velocity_supplier: StatusSignal[float]
+    pivot_position_supplier: StatusSignal[float]
     flywheel_velocity_supplier: StatusSignal[float]
 
     def __init__(self) -> None:
         self.state = "IDLE"
-        self.target_shooter_angle = 0.0
+        self.target_pivot_angle = 0.0
         self.target_flywheel_speed = 0.0
 
         self.pivot_voltage = 0.0
@@ -207,5 +224,6 @@ class ShooterIO(IO):
         self.indexer_voltage = 0.0
 
         self.tuning_sendables_sent = False
+        self.continue_to_shoot = False
 
         super().__init__()

@@ -34,7 +34,6 @@ class IntakeStates(Enum):
 
 
 class Intake:
-
     manual_tuning_mode = tunable(False)
 
     def __init__(self, config: IntakeConfig, mech_root: MechanismRoot2d) -> None:
@@ -79,9 +78,6 @@ class Intake:
 
         self.config = config
 
-        self.io = IntakeIO()
-        self._set_up_logging()
-
         self.pid_sim = SimplePControllerSim(
             self.pivot_pid, SlewRateLimiter(6), ZERO_POSITION
         )
@@ -89,9 +85,12 @@ class Intake:
         self.mech_ligament = mech_root.appendLigament(
             name="Arm ligament",
             length=1.5,
-            angle=math.degrees(self.get_pivot_position()),
+            angle=math.degrees(self.get_pivot_angle()),
             color=Color8Bit(0, 0, 255),  # RGB
         )
+
+        self.io = IntakeIO()
+        self._set_up_logging()
 
     @property
     def state(self) -> IntakeStates:
@@ -115,14 +114,11 @@ class Intake:
     def grab_note(self) -> None:
         self.state = IntakeStates.DEPLOYED
 
-    def get_pivot_position(self) -> units.radians:
+    def get_pivot_angle(self) -> units.radians:
         if RobotBase.isSimulation():
             return self.pid_sim.value
 
         return self.io.pivot_position_supplier.value * math.tau * self.config.gear_ratio
-
-    def get_pivot_velocity(self) -> units.radians_per_second:
-        return self.io.pivot_velocity_supplier.value * math.tau * self.config.gear_ratio
 
     def has_note(self) -> bool:
         return self.beam_break.get()
@@ -138,11 +134,11 @@ class Intake:
         self.pid_sim.update()
 
         if (
-            self.io.target_pivot_position != self.pivot_pid.getGoal().position
+            self.io.target_pivot_angle != self.pivot_pid.getGoal().position
             and not self.manual_tuning_mode
         ):
             self.pivot_pid.setGoal(
-                clamp(self.io.target_pivot_position, MIN_POSITION, ZERO_POSITION)
+                clamp(self.io.target_pivot_angle, MIN_POSITION, ZERO_POSITION)
             )
         elif self.manual_tuning_mode:
             self.pivot_pid.setGoal(
@@ -151,20 +147,22 @@ class Intake:
 
         if RobotBase.isSimulation():
             self.pid_sim.update()
-            self.mech_ligament.setAngle(math.degrees(self.get_pivot_position()))
+            self.mech_ligament.setAngle(math.degrees(self.get_pivot_angle()))
             return
 
+        self.io.pivot_voltage = self.pivot_pid.calculate(
+            self.get_pivot_angle()
+        ) + self.pivot_ff.calculate(self.get_pivot_angle(), 0)
         self.pivot_motor.set_control(
             self.pivot_voltage_request.with_output(
-                self.pivot_pid.calculate(self.get_pivot_position())
-                + self.pivot_ff.calculate(self.get_pivot_position(), 0)
+                self.io.pivot_voltage
             ).with_enable_foc(False)
         )
 
         if self.at_target_position():
             self.intake_rollers_motor.set_control(
                 self.intake_voltage_request.with_output(
-                    self.io.target_roller_voltage
+                    self.io.roller_voltage
                 ).with_enable_foc(False)
             )
 
@@ -177,13 +175,12 @@ class Intake:
 
         match self._state:
             case IntakeStates.IDLE:
-                self.io.target_roller_voltage = 0
-                self.io.target_pivot_position = math.radians(94)
-
+                self.io.roller_voltage = 0
+                self.io.target_pivot_angle = math.radians(94)
 
             case IntakeStates.EJECT:
-                self.io.target_roller_voltage = -2 # Check pos and speed
-                self.io.target_pivot_position = math.radians(45)
+                self.io.roller_voltage = -2  # Check pos and speed
+                self.io.target_pivot_angle = math.radians(45)
 
                 if not self.intake_timer.isRunning():
                     self.intake_timer.restart()
@@ -192,19 +189,19 @@ class Intake:
                     self.intake_timer.stop()
 
             case IntakeStates.DEPLOYED:
-                self.io.target_roller_voltage = 2
-                self.io.target_pivot_position = math.radians(-14)
+                self.io.roller_voltage = 2
+                self.io.target_pivot_angle = math.radians(-14)
 
                 if self.has_note():
                     self.state = IntakeStates.RETRACTING
 
             case IntakeStates.FEEDING:
-                self.io.target_roller_voltage = 2
-                self.io.target_pivot_position = math.radians(95.5)
+                self.io.roller_voltage = 2
+                self.io.target_pivot_angle = math.radians(95.5)
 
             case IntakeStates.RETRACTING:
-                self.io.target_roller_voltage = 0.2
-                self.io.target_pivot_position = math.radians(95.5)
+                self.io.roller_voltage = 0.2
+                self.io.target_pivot_angle = math.radians(95.5)
 
                 if self.at_target_position():
                     self.state = IntakeStates.FEEDING
@@ -212,16 +209,14 @@ class Intake:
     def _set_up_logging(self) -> None:
         self.io.add_function(self.has_note)
         self.io.add_function(self.at_target_position)
-        self.io.add_function(self.get_pivot_position)
-        self.io.add_function(self.get_pivot_velocity)
+        self.io.add_function(self.get_pivot_angle, math.degrees)
 
-        self.io.target_pivot_position = math.radians(94)
-        self.io.target_roller_voltage = 0
-        self.pivot_pid.setGoal(self.io.target_pivot_position)
+        self.io.target_pivot_angle = math.radians(94)
+        self.io.roller_voltage = 0
+        self.pivot_pid.setGoal(self.io.target_pivot_angle)
 
         self.io.pivot_position_supplier = self.pivot_motor.get_position()
-        self.io.pivot_velocity_supplier = self.pivot_motor.get_velocity()
 
         BaseStatusSignal.set_update_frequency_for_all(
-            250, self.io.pivot_position_supplier, self.io.pivot_velocity_supplier
+            250, self.io.pivot_position_supplier
         )

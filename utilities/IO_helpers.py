@@ -54,9 +54,10 @@ class PublisherSpecifications:
     modifiers: dict[AnyAmountStr, Callable[[Any], Any]] = field(default_factory=dict)
     conditions: dict[AnyAmountStr, Callable[[], bool]] = field(default_factory=dict)
     container: str | None = None
-    ignore_fields: set = field(default_factory=set)
-    high_resolution: set = field(default_factory=set)
-    rename: bool | None = True
+    ignore_fields: set[str] = field(default_factory=set)
+    high_resolution: set[str] = field(default_factory=set)
+    rename: bool = True
+    insert_class_name: set[str] = field(default_factory=set)
 
 
 def auto_log(cls):
@@ -609,7 +610,7 @@ def _get_type_from_annotation(annotation: type) -> tuple[type, bool]:
     return (return_type, arr)
 
 
-def register_wildcards(name: str, provided: str) -> bool:
+def _register_wildcards(name: str, provided: str) -> bool:
     if provided.endswith("*") and provided.startswith("*"):
         return provided.replace("*", "") in name
     elif provided.endswith("*"):
@@ -623,7 +624,9 @@ def check_name(names: str | Iterable[str], provided: str) -> bool:
     if isinstance(names, str):
         names = [names]
 
-    return any(name == provided or register_wildcards(name, provided) for name in names)
+    return any(
+        name == provided or _register_wildcards(name, provided) for name in names
+    )
 
 
 def _get_dict_value_from_specifications(
@@ -707,6 +710,12 @@ def _create_publishers_for_static_annotations(
         modifier = _get_dict_value_from_specifications(
             clean_name, name, specifications_dict=specifications.modifiers
         )  # No real way to check types here
+
+        if (
+            name in specifications.insert_class_name
+            or clean_name in specifications.insert_class_name
+        ):
+            clean_name = cls.__name__.removesuffix("IO") + " " + clean_name
 
         if any(
             check_name((name, clean_name), provided=field)
@@ -798,6 +807,12 @@ def _create_publishers_from_class(
         if modifier:
             val = modifier(val)
 
+        if (
+            name in specifications.insert_class_name
+            or clean_name in specifications.insert_class_name
+        ):
+            clean_name = type(cls).__name__.removesuffix("IO") + " " + clean_name
+
         publisher = _create_publisher_for_type(
             val, extra_instance or nt_instance, clean_name
         )
@@ -856,15 +871,15 @@ def _create_publisher_from_function(
     full_path = f"{MAIN_TABLE}{'/' + specifications.container if specifications.container is not None else ''}{'/' + type(cls).__name__}{'/' + extra_table if extra_table is not None else ''}"
     nt_instance = NT_INSTANCE.getTable(full_path)
 
-    func_name = _filter_name(func.__name__) if specifications.rename else func.__name__
+    clean_name = _filter_name(func.__name__) if specifications.rename else func.__name__
 
-    if func_name == nt_instance.getPath().split("/")[-1]:
+    if clean_name == nt_instance.getPath().split("/")[-1]:
         raise ValueError(
             "Function topic has same name as subfolder. Please change one otherwise there can be logging issues."
         )
 
     if any(
-        check_name((func.__name__, func_name), provided=field)
+        check_name((func.__name__, clean_name), provided=field)
         for field in specifications.ignore_fields
     ):
         logger.info(
@@ -872,5 +887,11 @@ def _create_publisher_from_function(
         )
         return
 
-    publisher = _create_publisher_for_type(rtype, nt_instance, func_name)
+    if (
+        clean_name in specifications.insert_class_name
+        or func.__name__ in specifications.insert_class_name
+    ):
+        clean_name = type(cls).__name__.removesuffix("IO") + " " + clean_name
+
+    publisher = _create_publisher_for_type(rtype, nt_instance, clean_name)
     return PublisherInfo(func, None, publisher.set, modifier, None, cls)

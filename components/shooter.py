@@ -1,7 +1,6 @@
 import math
 from enum import Enum
 
-import wpilib
 import wpimath.units as units
 from magicbot import tunable
 from phoenix6 import BaseStatusSignal
@@ -45,7 +44,7 @@ HOLDING_ANGLE = math.radians(25)
 MIN_SHOOTER_ANGLE = math.radians(-7)
 MAX_SHOOTER_ANGLE = math.radians(43)
 
-MAX_SHOOTER_SPEED = 250 # Closer to 300 on actual robot bc bad ff tuning
+MAX_SHOOTER_SPEED = 250  # Closer to 300 on actual robot bc bad ff tuning
 
 ABS_ENCODER_OFFSET = 0.176  # Position absolute encoder reads when held horizontally
 
@@ -161,8 +160,14 @@ class Shooter:
     def go_to_idle(self) -> None:
         self.state = ShooterStates.IDLE
 
-    def shoot(self) -> None:
+    def aim(self, angle: units.degrees = 40, continue_to_shoot=False) -> None:
+        self.io.target_pivot_angle = math.radians(angle)
         self.state = ShooterStates.AIMING
+
+        self.io.continue_to_shoot = continue_to_shoot
+
+    def shoot(self) -> None:
+        self.state = ShooterStates.SHOOTING
 
     def feed(self) -> None:
         self.state = ShooterStates.FEEDING
@@ -178,12 +183,7 @@ class Shooter:
 
     def get_pivot_angle(self) -> units.radians:
         return (
-            self.io.pivot_angle_supplier.value * self.config.pivot_gear_ratio * math.tau
-        )
-
-    def get_pivot_speed(self) -> units.radians_per_second:
-        return (
-            self.io.pivot_angular_velocity_supplier.value
+            self.io.pivot_position_supplier.value
             * self.config.pivot_gear_ratio
             * math.tau
         )
@@ -204,15 +204,15 @@ class Shooter:
             return self.pid_sim.at_goal()
         return self.pivot_pid.atGoal()
 
-    def at_target_speed(self) -> bool:
+    def at_target_flywheel_speed(self) -> bool:
         return self.get_flywheel_speed() >= self.io.target_flywheel_speed
 
     def execute(self):
         # TODO: Implement logic with io for sport mode
         self._handle_state_logic()
 
-        self.io.target_shooter_angle = clamp(
-            self.io.target_shooter_angle,
+        self.io.target_pivot_angle = clamp(
+            self.io.target_pivot_angle,
             MIN_SHOOTER_ANGLE,
             MAX_SHOOTER_ANGLE,
         )
@@ -225,7 +225,7 @@ class Shooter:
             self.get_pivot_angle() >= MIN_SHOOTER_ANGLE
             and self.get_pivot_angle() <= MAX_SHOOTER_ANGLE
         ):
-            self.pivot_pid.setGoal(self.io.target_shooter_angle)
+            self.pivot_pid.setGoal(self.io.target_pivot_angle)
             self.io.pivot_voltage = self.pivot_pid.calculate(
                 self.get_pivot_angle()
             ) + self.pivot_ff.calculate(self.get_pivot_angle(), 0.0)
@@ -269,7 +269,7 @@ class Shooter:
             self.io.tuning_sendables_sent = True
 
         if self.manual_tuning_mode:
-            self.io.target_shooter_angle = self.pivot_pid.getGoal().position
+            self.io.target_pivot_angle = self.pivot_pid.getGoal().position
             self.io.target_flywheel_speed = self.manual_flywheel_speed
             self.io.indexer_voltage = 0
             self.io.state = "Manual Tuning"
@@ -279,47 +279,46 @@ class Shooter:
 
         match self.state:
             case ShooterStates.IDLE:
-                self.io.target_shooter_angle = FEEDING_ANGLE
+                self.io.target_pivot_angle = FEEDING_ANGLE
                 self.io.indexer_voltage = 0
                 self.io.target_flywheel_speed = 0
 
             case ShooterStates.FEEDING:
-                self.io.target_shooter_angle = FEEDING_ANGLE
+                self.io.target_pivot_angle = FEEDING_ANGLE
                 self.io.indexer_voltage = INDEXER_FEED_VOLTAGE
                 self.io.target_flywheel_speed = 0
 
                 if self.has_note():
                     if not self.timer.isRunning():
                         self.timer.restart()
-                    elif (
-                        self.timer.get() >= FEED_DELAY
-                    ):
+                    elif self.timer.get() >= FEED_DELAY:
                         self.state = ShooterStates.HOLDING
                         self.io.indexer_voltage = 0
                         self.timer.stop()
 
             case ShooterStates.HOLDING:
-                self.io.target_shooter_angle = HOLDING_ANGLE
+                self.io.target_pivot_angle = HOLDING_ANGLE
                 self.io.indexer_voltage = 0
                 self.io.target_flywheel_speed = 0
 
             case ShooterStates.AIMING:
-                self.io.target_shooter_angle = SUBWOOFER_SHOOTING_ANGLE
                 self.io.indexer_voltage = 0
-                self.io.target_flywheel_speed = SHOOTER_SHOOTING_SPEED
-                if self.at_target_position() and self.at_target_speed():
+                self.io.target_flywheel_speed = 0
+
+                if self.at_target_position() and self.io.continue_to_shoot:
                     self.state = ShooterStates.SHOOTING
 
             case ShooterStates.SHOOTING:
-                self.io.target_shooter_angle = SUBWOOFER_SHOOTING_ANGLE
                 self.io.target_flywheel_speed = SHOOTER_SHOOTING_SPEED
-                self.io.indexer_voltage = INDEXER_SHOOTING_VOLTAGE
-            
-                if not self.has_note():
-                    self.state = ShooterStates.IDLE
+
+                if self.at_target_flywheel_speed():
+                    self.io.indexer_voltage = INDEXER_SHOOTING_VOLTAGE
+
+                    if not self.has_note():
+                        self.state = ShooterStates.IDLE
 
             case ShooterStates.EJECT:
-                self.io.target_shooter_angle = 0
+                self.io.target_pivot_angle = 0
                 self.io.target_flywheel_speed = 50
 
                 if self.get_flywheel_speed() > 30:
@@ -334,23 +333,20 @@ class Shooter:
                     self.timer.stop()
 
     def _set_up_logging(self) -> None:
-        self.io.pivot_angle_supplier = self.pivot_motor.get_position()
-        self.io.pivot_angular_velocity_supplier = self.pivot_motor.get_velocity()
+        self.io.pivot_position_supplier = self.pivot_motor.get_position()
         self.io.flywheel_velocity_supplier = self.top_flywheel_motor.get_velocity()
 
         self.io.add_function(self.has_note)
         self.io.add_function(self.get_pivot_angle, math.degrees)
-        self.io.add_function(self.get_pivot_speed)
         self.io.add_function(self.at_target_position)
         self.io.add_function(self.get_flywheel_speed)
-        self.io.add_function(self.at_target_speed)
+        self.io.add_function(self.at_target_flywheel_speed)
         self.io.add_function(self.get_abs_position)
 
-        self.pivot_pid.setGoal(self.io.target_shooter_angle)
+        self.pivot_pid.setGoal(self.io.target_pivot_angle)
 
         BaseStatusSignal.set_update_frequency_for_all(
             250,
-            self.io.pivot_angle_supplier,
-            self.io.pivot_angular_velocity_supplier,
+            self.io.pivot_position_supplier,
             self.io.flywheel_velocity_supplier,
         )
