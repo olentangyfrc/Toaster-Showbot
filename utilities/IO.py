@@ -157,6 +157,16 @@ class RobotIO(IO):
         self.time = 0.0
         super().__init__()
 
+@auto_log
+class VisionIO(IO):
+    SPECIFICATIONS = PublisherSpecifications(high_resolution={"get_fused_pose"})
+
+    most_recent_pose_measurements: tuple[
+        Pose2d, ...
+    ]  # a tuple of the most recent measures for each limelight in order
+
+    def __init__(self) -> None:
+        self.fused_pose_str = ""
 
 @auto_log
 class IntakeIO(IO):
