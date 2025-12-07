@@ -56,6 +56,7 @@ class MyRobot(MagicRobot):
         meta_table.putString("Serial Number", RobotController.getSerialNumber())
 
         self.controller = XboxController(0)
+        self.aux_controller = XboxController(1)
         self.CANbus = CANBus("*")
 
         swerve_config = SwerveConfig(
@@ -147,8 +148,14 @@ class MyRobot(MagicRobot):
         if self.controller.getYButtonPressed():
             self.drivetrain.gyro.set_yaw(0)
 
-        if self.controller.getStartButton():
+        if self.controller.getStartButton() or self.aux_controller.getStartButton():
             self.cancel_all()
+
+        if self.aux_controller.getBButton(): 
+            self.drivetrain.operator_lock = True
+        
+        if self.aux_controller.getAButton(): 
+            self.drivetrain.operator_lock = False
 
         if (
             self.controller.getRightTriggerAxis() > 0.2
