@@ -31,6 +31,7 @@ class IntakeStates(Enum):
     RETRACTING = 3
     FEEDING = 5
     EJECT = 6
+    BOOT_UP = 7
 
 
 class Intake:
@@ -67,9 +68,10 @@ class Intake:
         )
         self.pivot_pid.setTolerance(0.03)
         self.pivot_pid.reset(ZERO_POSITION)
-        self.pivot_motor.set_position(ZERO_POSITION / math.tau / config.gear_ratio)
 
-        self._state = IntakeStates.IDLE
+        self.boot_up_finished = False
+        
+        self._state = IntakeStates.BOOT_UP
 
         self.intake_voltage_request = VoltageOut(0)
         self.pivot_voltage_request = VoltageOut(0)
@@ -127,6 +129,9 @@ class Intake:
         if RobotBase.isSimulation():
             return self.pid_sim.at_goal()
         return self.pivot_pid.atGoal()
+    
+    def get_mag_switch(self) -> bool: 
+        raise NotImplementedError
 
     def execute(self):
         self._handle_state_logic()
@@ -153,11 +158,19 @@ class Intake:
         self.io.pivot_voltage = self.pivot_pid.calculate(
             self.get_pivot_angle()
         ) + self.pivot_ff.calculate(self.get_pivot_angle(), 0)
-        self.pivot_motor.set_control(
-            self.pivot_voltage_request.with_output(
-                self.io.pivot_voltage
-            ).with_enable_foc(False)
-        )
+        
+        if not self.state == IntakeStates.BOOT_UP:
+            self.pivot_motor.set_control(
+                self.pivot_voltage_request.with_output(
+                    self.io.pivot_voltage
+                ).with_enable_foc(False)
+            )
+        else: 
+            self.pivot_motor.set_control(
+                self.pivot_voltage_request.with_output(
+                    1
+                ).with_enable_foc(False)
+            )
 
         if self.at_target_position():
             self.intake_rollers_motor.set_control(
@@ -174,6 +187,13 @@ class Intake:
         self.io.state = self.state.name
 
         match self._state:
+            case IntakeStates.BOOT_UP: 
+                self.io.roller_voltage = 0
+
+                if self.get_mag_switch():
+                    self.pivot_motor.set_position(ZERO_POSITION / math.tau / self.config.gear_ratio)
+                    self.state = IntakeStates.IDLE
+
             case IntakeStates.IDLE:
                 self.io.roller_voltage = 0
                 self.io.target_pivot_angle = math.radians(94)
@@ -210,6 +230,7 @@ class Intake:
         self.io.add_function(self.has_note)
         self.io.add_function(self.at_target_position)
         self.io.add_function(self.get_pivot_angle, math.degrees)
+        self.io.add_function(self.get_mag_switch)
 
         self.io.target_pivot_angle = math.radians(94)
         self.io.roller_voltage = 0
