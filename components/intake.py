@@ -40,6 +40,7 @@ class Intake:
     def __init__(self, config: IntakeConfig, mech_root: MechanismRoot2d) -> None:
         self.intake_rollers_motor = TalonFX(config.roller_id, config.CANbus)
         self.beam_break = DigitalInput(config.beam_break_id)
+        self.mag_switch = DigitalInput(config.mag_switch_id)
 
         self.pivot_configs = TalonFXConfiguration()
         self.pivot_configs.motor_output.neutral_mode = NeutralModeValue.BRAKE
@@ -130,8 +131,8 @@ class Intake:
             return self.pid_sim.at_goal()
         return self.pivot_pid.atGoal()
     
-    def get_mag_switch(self) -> bool: 
-        raise NotImplementedError
+    def at_rest(self) -> bool: 
+        self.mag_switch.get()
 
     def execute(self):
         self._handle_state_logic()
@@ -190,9 +191,10 @@ class Intake:
             case IntakeStates.BOOT_UP: 
                 self.io.roller_voltage = 0
 
-                if self.get_mag_switch():
+                if self.at_rest():
                     self.pivot_motor.set_position(ZERO_POSITION / math.tau / self.config.gear_ratio)
                     self.state = IntakeStates.IDLE
+                    self.boot_up_finished = True
 
             case IntakeStates.IDLE:
                 self.io.roller_voltage = 0

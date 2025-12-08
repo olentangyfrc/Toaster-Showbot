@@ -93,6 +93,7 @@ class MyRobot(MagicRobot):
         self.intake_config = IntakeConfig(
             roller_id=42,
             beam_break_id=3,
+            mag_switch_id=67, #TODO: Change this to the correct one
             pivot_motor_id=31,
             gear_ratio=16 / 510,
             pivot_ff=FFConstants(0.19, 0, 0, 0.41),

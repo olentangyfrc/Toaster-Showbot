@@ -70,6 +70,7 @@ class DrivetrainConfig:
 class IntakeConfig:
     roller_id: int
     beam_break_id: int
+    mag_switch_id: int
     pivot_motor_id: int
     gear_ratio: float
     pivot_ff: FFConstants
