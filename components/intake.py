@@ -192,14 +192,14 @@ class Intake:
                     self.intake_timer.stop()
 
             case IntakeStates.DEPLOYED:
-                self.io.target_roller_voltage = 2
-                self.io.target_pivot_position = math.radians(-14)
+                self.io.target_roller_voltage = 2.5
+                self.io.target_pivot_position = math.radians(-18)
 
                 if self.has_note():
                     self.state = IntakeStates.RETRACTING
 
             case IntakeStates.FEEDING:
-                self.io.target_roller_voltage = 2
+                self.io.target_roller_voltage = 0.3
                 self.io.target_pivot_position = math.radians(95.5)
 
             case IntakeStates.RETRACTING:

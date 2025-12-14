@@ -140,7 +140,7 @@ class MyRobot(MagicRobot):
         with self.consumeExceptions():
             self._drive_with_joystick()
 
-        if self.controller.getXButton():
+        if self.controller.getRightBumperButton():
             self.drivetrain.enable_motion_limiting()
         elif self.drivetrain.is_motion_limited():
             self.drivetrain.disable_motion_limiting()
@@ -148,11 +148,13 @@ class MyRobot(MagicRobot):
         if self.controller.getYButtonPressed():
             self.drivetrain.gyro.set_yaw(0)
 
-        if self.controller.getStartButton() or self.aux_controller.getStartButton():
+        if self.controller.getLeftBumperButton() or self.aux_controller.getStartButton():
             self.cancel_all()
 
         if self.aux_controller.getBButton(): 
             self.drivetrain.operator_lock = True
+        # if self.controller.rightBumper():
+            
         
         if self.aux_controller.getAButton(): 
             self.drivetrain.operator_lock = False
