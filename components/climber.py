@@ -31,7 +31,6 @@ class Climber:
 
         self._state = ClimberPositions.DISABLED
         self.previous_state = ClimberPositions.DISABLED
-
         # self.climbing_PID_controller = controller.ProfiledPIDController(600,0,0, trajectory.TrapezoidProfile.Constraints(9999999,3))
         # self.climbing_PID_controller.setTolerance(self.TOLERANCE_METERS)
 

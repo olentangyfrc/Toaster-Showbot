@@ -6,6 +6,7 @@ from wpilib import (
     DataLogManager,
     DriverStation,
     Mechanism2d,
+    PWM,
     RobotController,
     SmartDashboard,
     Timer,
@@ -16,14 +17,15 @@ from wpimath.kinematics import ChassisSpeeds
 
 from components.climber import Climber
 from components.drivetrain import DriveSignal, Drivetrain
-from components.intake import Intake, IntakeStates
+# from components.intake import Intake, IntakeStates
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
-from components.shooter import Shooter, ShooterStates
+# from components.shooter import Shooter, Shooter States
+
 from utilities import helpers as utils
 from utilities.configs import (
     DrivetrainConfig,
-    IntakeConfig,
-    ShooterConfig,
+    # IntakeConfig,
+    # ShooterConfig,
     SwerveConfig,
 )
 from utilities.elasticlib import Notification, NotificationLevel, NotificationManager
@@ -34,8 +36,8 @@ from utilities.IO_helpers import IO
 class MyRobot(MagicRobot):
     drivetrain: Drivetrain
     climber: Climber
-    intake: Intake
-    shooter: Shooter
+    # intake: Intake
+    # shooter: Shooter
 
     def createObjects(self) -> None:
         DataLogManager.start()
@@ -54,6 +56,8 @@ class MyRobot(MagicRobot):
         meta_table.putString("Runtime Type", self.getRuntimeType().name[1:])
         meta_table.putString("Serial Number", RobotController.getSerialNumber())
 
+
+
         self.controller = XboxController(0)
         self.CANbus = CANBus("*")
 
@@ -64,7 +68,7 @@ class MyRobot(MagicRobot):
             drive_pid_constants=PIDConstants(0.5, 0, 0),
             ff_constants=FFConstants(0.2278, 2.4176, 0),
             wheel_radius=0.08592 / 2,
-            drive_motor_type=MotorTypes.KRAKEN_X60_FOC,
+            drive_motor_type=MotorTypes.FALCON_500,
         )
 
         self.drivetrain_config = DrivetrainConfig(
@@ -90,38 +94,38 @@ class MyRobot(MagicRobot):
             CANbus=self.CANbus,
         )
 
-        self.intake_config = IntakeConfig(
-            roller_id=42,
-            beam_break_id=3,
-            pivot_motor_id=31,
-            gear_ratio=16 / 510,
-            pivot_ff=FFConstants(0.19, 0, 0, 0.41),
-            pivot_pid=PIDConstants(5.3, 0, 0.07),
-            profile_constants=ProfileConstants(0, 0),  # TODO: probably implement these
-            CANbus=self.CANbus,
-        )
+        # self.intake_config = IntakeConfig(
+        #     roller_id=42,
+        #     beam_break_id=3,
+        #     pivot_motor_id=31,
+        #     gear_ratio=16 / 510,
+        #     pivot_ff=FFConstants(0.19, 0, 0, 0.41),
+        #     pivot_pid=PIDConstants(5.3, 0, 0.07),
+        #     profile_constants=ProfileConstants(0, 0),  # TODO: probably implement these
+        #     CANbus=self.CANbus,
+        # )
 
-        self.shooter_config = ShooterConfig(
-            indexer_id=47,
-            beam_break_id=1,
-            pivot_motor_id=35,
-            bottom_flywheel_motor_id=36,
-            top_flywheel_motor_id=37,
-            shooter_speed_ff=FFConstants(0.0862775, 0.113191 / 4, 0, 0),
-            shooter_gear_ratio=12 / 15,
-            pivot_abs_encoder_id=0,
-            pivot_pid=PIDConstants(20, 5, 0),
-            pivot_profile_constraints=ProfileConstants(
-                9999, 1000
-            ),  # TODO: probably implement these
-            pivot_ff=FFConstants(0, 0.03, 0, 0),
-            pivot_gear_ratio=1 / 108,
-            CANbus=self.CANbus,
-        )
+        # self.shooter_config = ShooterConfig(
+        #     indexer_id=47,
+        #     beam_break_id=1,
+        #     pivot_motor_id=35,
+        #     bottom_flywheel_motor_id=36,
+        #     top_flywheel_motor_id=37,
+        #     shooter_speed_ff=FFConstants(0.0862775, 0.113191 / 4, 0, 0),
+        #     shooter_gear_ratio=12 / 15,
+        #     pivot_abs_encoder_id=0,
+        #     pivot_pid=PIDConstants(20, 5, 0),
+        #     pivot_profile_constraints=ProfileConstants(
+        #         9999, 1000
+        #     ),  # TODO: probably implement these
+        #     pivot_ff=FFConstants(0, 0.03, 0, 0),
+        #     pivot_gear_ratio=1 / 108,
+        #     CANbus=self.CANbus,
+        # )
 
         self.mech = Mechanism2d(4, 4, Color8Bit(255, 255, 255))
-        self.intake_mech_root = self.mech.getRoot("Intake", 0, 1.5)
-        self.shooter_mech_root = self.mech.getRoot("Shooter", 0, 3)
+        # self.intake_mech_root = self.mech.getRoot("Intake", 0, 1.5)
+        # self.shooter_mech_root = self.mech.getRoot("Shooter", 0, 3)
 
         SmartDashboard.putData("Mechanism", self.mech)
 
@@ -132,60 +136,67 @@ class MyRobot(MagicRobot):
         IO.flush_publishers()  # Have to do here because publishers aren't setup otherwise
 
     def teleopPeriodic(self) -> None:
+      
+
         if not self.timer.isRunning():
             self.timer.restart()
 
         with self.consumeExceptions():
             self._drive_with_joystick()
 
-        if self.controller.getXButton():
+        if not self.controller.getXButton():
             self.drivetrain.enable_motion_limiting()
         elif self.drivetrain.is_motion_limited():
             self.drivetrain.disable_motion_limiting()
 
         if self.controller.getYButtonPressed():
             self.drivetrain.gyro.set_yaw(0)
+        
+        
+        # if self.controller.getAButton():
+            # self.drivetrain.
 
-        if self.controller.getStartButton():
-            self.cancel_all()
+        # if self.controller.getStartButton():
+        #     self.cancel_all()
 
-        if (
-            self.controller.getRightTriggerAxis() > 0.2
-            and not self.intake.has_note()
-            and not self.shooter.has_note()
-            and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
-        ):
-            self.intake.grab_note()
-        elif (
-            self.intake.state == IntakeStates.DEPLOYED
-            or self.shooter.state == ShooterStates.HOLDING
-        ) and not self.intake.has_note():
-            self.intake.go_to_idle()
-        elif self.intake.state in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
-            self.shooter.feed()
+        # if (
+        #     self.controller.getRightTriggerAxis() > 0.2
+        #     and not self.intake.has_note()
+        #     and not self.shooter.has_note()
+        #     and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
+        # ):
+        #     self.intake.grab_note()
+        # elif (
+        #     self.intake.state == IntakeStates.DEPLOYED
+        #     or self.shooter.state == ShooterStates.HOLDING
+        # ) and not self.intake.has_note():
+        #     self.intake.go_to_idle()
+        # elif self.intake.state in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
+        #     self.shooter.feed()
 
-        if self.shooter.has_note():
-            if self.shooter.state != ShooterStates.SHOOTING:
-                if self.controller.getPOV() == 0:
-                    self.shooter.aim(5)
-                elif self.controller.getPOV() == 90:
-                    self.shooter.aim(15)
-                elif self.controller.getPOV() == 90:
-                    self.shooter.aim(25)
-                elif self.controller.getPOV() == 90:
-                    self.shooter.aim(35)
+        # if self.shooter.has_note():
+        #     if self.shooter.state != ShooterStates.SHOOTING:
+        #         if self.controller.getPOV() == 0:
+        #             self.shooter.aim(5)
+        #         elif self.controller.getPOV() == 90:
+        #             self.shooter.aim(15)
+        #         elif self.controller.getPOV() == 90:
+        #             self.shooter.aim(25)
+        #         elif self.controller.getPOV() == 90:
+        #             self.shooter.aim(35)
 
-            if self.controller.getLeftTriggerAxis() > 0.2:
-                if (
-                    self.shooter.state == ShooterStates.HOLDING
-                ):  # Direct shot, no preaiming
-                    self.shooter.aim(40, True)
-                elif self.shooter.state == ShooterStates.AIMING:
-                    self.shooter.shoot()
+        #     if self.controller.getLeftTriggerAxis() > 0.2:
+        #         if (
+        #             self.shooter.state == ShooterStates.HOLDING
+        #         ):  # Direct shot, no preaiming
+        #             self.shooter.aim(40, True)
+        #         elif self.shooter.state == ShooterStates.AIMING:
+        #             self.shooter.shoot()
 
     def robotPeriodic(self) -> None:
         # Stops unimportant notifications during comp
-        IO.update_publishers()
+        # IO.update_publishers()
+        IO._handle_signal_refreshing()
         self.watchdog.addEpoch("I/O")
 
         NotificationManager.send_notifications(DriverStation.isFMSAttached())
@@ -238,6 +249,6 @@ class MyRobot(MagicRobot):
             lambda: RobotController.isBrownedOut(),
         )
 
-    def cancel_all(self) -> None:
-        self.intake.eject()
-        self.shooter.eject()
+    # def cancel_all(self) -> None:
+    #     self.intake.eject()
+    #     self.shooter.eject()

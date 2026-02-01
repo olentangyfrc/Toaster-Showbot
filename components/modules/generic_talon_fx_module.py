@@ -108,7 +108,7 @@ class GenericTalonFXModule(Module):
         )
 
         self.steer_pid.enableContinuousInput(-math.pi, math.pi)
-        self.steer_pid.setTolerance(math.radians(1))
+        self.steer_pid.setTolerance(math.radians(2.5))
 
         self.drive_request = VoltageOut(0)
         self.steer_request = VoltageOut(0)
