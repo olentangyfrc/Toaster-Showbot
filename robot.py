@@ -2,11 +2,11 @@ from magicbot import MagicRobot
 from ntcore import NetworkTableInstance
 from phoenix6 import CANBus
 from wpilib import (
+    AddressableLED,
     Color8Bit,
     DataLogManager,
     DriverStation,
     Mechanism2d,
-    PWM,
     RobotController,
     SmartDashboard,
     Timer,
@@ -15,52 +15,40 @@ from wpilib import (
 from wpilib.deployinfo import getDeployData
 from wpimath.kinematics import ChassisSpeeds
 
+# Components
 from components.climber import Climber
+from components.leds import LEDController, LEDMode
 from components.drivetrain import DriveSignal, Drivetrain
-# from components.intake import Intake, IntakeStates
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
-# from components.shooter import Shooter, Shooter States
 
 from utilities import helpers as utils
-from utilities.configs import (
-    DrivetrainConfig,
-    # IntakeConfig,
-    # ShooterConfig,
-    SwerveConfig,
-)
+from utilities.configs import DrivetrainConfig, SwerveConfig
 from utilities.elasticlib import Notification, NotificationLevel, NotificationManager
-from utilities.helpers import FFConstants, MotorTypes, PIDConstants, ProfileConstants
+from utilities.helpers import FFConstants, MotorTypes, PIDConstants
 from utilities.IO_helpers import IO
-
 
 class MyRobot(MagicRobot):
     drivetrain: Drivetrain
     climber: Climber
-    # intake: Intake
-    # shooter: Shooter
+    led_control: LEDController  # MagicBot injects this
 
     def createObjects(self) -> None:
         DataLogManager.start()
-        DataLogManager.logNetworkTables(True)
-        DataLogManager.logConsoleOutput(True)
-        DriverStation.startDataLog(DataLogManager.getLog())
-
-        # Logs some meta data for advantagescope
+        
+        # Metadata for Advantagescope/Elastic
         meta_table = NetworkTableInstance.getDefault().getTable("Metadata")
         deploy_info = getDeployData()
-
-        if deploy_info is not None:
+        if deploy_info:
             for key, value in deploy_info.items():
                 meta_table.putString(key, value)
-
-        meta_table.putString("Runtime Type", self.getRuntimeType().name[1:])
-        meta_table.putString("Serial Number", RobotController.getSerialNumber())
-
-
 
         self.controller = XboxController(0)
         self.CANbus = CANBus("*")
 
+        # LED Hardware: Single strip of 29 LEDs on Port 0
+        self.led_strip = AddressableLED(0) 
+
+        # Drivetrain Config
         swerve_config = SwerveConfig(
             drive_ratio=1 / 7.7142857,
             steer_ratio=1 / 7.7142857 if self.isReal() else 1 / 25.9,
@@ -77,7 +65,7 @@ class MyRobot(MagicRobot):
             steer_encoder_ids=(19, 18, 17, 16),
             gyro_id=51,
             module_offsets=(46.85, 0.5, 261.21, 57.04),
-            drive_inverted=(False, False, False, False),  # True = clockwise positive
+            drive_inverted=(False, False, False, False),
             steer_inverted=(True, True, True, True),
             max_translation_speed=4.59,
             max_rotation_speed=7,
@@ -94,161 +82,100 @@ class MyRobot(MagicRobot):
             CANbus=self.CANbus,
         )
 
-        # self.intake_config = IntakeConfig(
-        #     roller_id=42,
-        #     beam_break_id=3,
-        #     pivot_motor_id=31,
-        #     gear_ratio=16 / 510,
-        #     pivot_ff=FFConstants(0.19, 0, 0, 0.41),
-        #     pivot_pid=PIDConstants(5.3, 0, 0.07),
-        #     profile_constants=ProfileConstants(0, 0),  # TODO: probably implement these
-        #     CANbus=self.CANbus,
-        # )
-
-        # self.shooter_config = ShooterConfig(
-        #     indexer_id=47,
-        #     beam_break_id=1,
-        #     pivot_motor_id=35,
-        #     bottom_flywheel_motor_id=36,
-        #     top_flywheel_motor_id=37,
-        #     shooter_speed_ff=FFConstants(0.0862775, 0.113191 / 4, 0, 0),
-        #     shooter_gear_ratio=12 / 15,
-        #     pivot_abs_encoder_id=0,
-        #     pivot_pid=PIDConstants(20, 5, 0),
-        #     pivot_profile_constraints=ProfileConstants(
-        #         9999, 1000
-        #     ),  # TODO: probably implement these
-        #     pivot_ff=FFConstants(0, 0.03, 0, 0),
-        #     pivot_gear_ratio=1 / 108,
-        #     CANbus=self.CANbus,
-        # )
-
-        self.mech = Mechanism2d(4, 4, Color8Bit(255, 255, 255))
-        # self.intake_mech_root = self.mech.getRoot("Intake", 0, 1.5)
-        # self.shooter_mech_root = self.mech.getRoot("Shooter", 0, 3)
-
-        SmartDashboard.putData("Mechanism", self.mech)
-
         self.timer = Timer()
-        self._set_up_notifications()
+        self._last_pov = -1
 
     def disabledInit(self) -> None:
-        IO.flush_publishers()  # Have to do here because publishers aren't setup otherwise
+        IO.flush_publishers()
 
     def teleopPeriodic(self) -> None:
-      
-
         if not self.timer.isRunning():
             self.timer.restart()
 
         with self.consumeExceptions():
             self._drive_with_joystick()
-
-        if not self.controller.getXButton():
-            self.drivetrain.enable_motion_limiting()
-        elif self.drivetrain.is_motion_limited():
+        if  self.controller.getXButton():
             self.drivetrain.disable_motion_limiting()
+        else: 
+            self.drivetrain.enable_motion_limiting()
+            
+        
 
+        # --- D-Pad Mode Cycling ---
+        pov = self.controller.getPOV()
+        if pov == 90 and self._last_pov != 90: # Right
+            self.led_control.cycle_mode(1)
+        elif pov == 270 and self._last_pov != 270: # Left
+            self.led_control.cycle_mode(-1)
+        self._last_pov = pov
+
+        # A Button: Reset to OFF
+        if self.controller.getAButtonPressed():
+            self.led_control.mode = LEDMode.OFF
+
+        # --- LED Mode Configurations ---
+        # We only assign values here. The math happens in components/leds.py
+        mode = self.led_control.mode
+
+        if mode == LEDMode.METEOR:
+            self.led_control.color = Color8Bit(0, 255, 0)
+            self.led_control.speed_bpm = 80 
+            self.led_control.tail_length = 2 
+
+        elif mode == LEDMode.PULSE:
+            self.led_control.color = Color8Bit(255, 0, 0) # Red Heartbeat
+            self.led_control.speed_bpm = 45 
+
+        elif mode == LEDMode.RAINBOW:
+            self.led_control.speed_bpm = 45 
+        
+        elif mode == LEDMode.SNAKE:
+            self.led_control.color = Color8Bit(255, 0, 0)
+            self.led_control.tail_length = 4
+            self.led_control.speed_bpm = 30
+            
+        elif mode == LEDMode.MATRIX:
+            self.led_control.speed_bpm = 10 
+            self.led_control.tail_length = 12 
+            
+        elif mode == LEDMode.BOUNCE:
+            self.led_control.color = Color8Bit(255, 0, 0) 
+            self.led_control.speed_bpm = 40
+            self.led_control.tail_length = 10
+            
+        elif mode == LEDMode.CONFETTI:
+            self.led_control.speed_bpm = 60 
+            self.led_control.tail_length = 5
+            
+        elif mode == LEDMode.BREATH:
+            self.led_control.color = Color8Bit(255, 0, 255) 
+            self.led_control.speed_bpm = 15 
+            
+        elif mode == LEDMode.SCROLL:
+            self.led_control.color = Color8Bit(255, 100, 0) 
+            self.led_control.speed_bpm = 25
+            
+        elif mode == LEDMode.FLAMES:
+            self.led_control.speed_bpm = 45
+
+        # --- Drivetrain Utilities ---
         if self.controller.getYButtonPressed():
             self.drivetrain.gyro.set_yaw(0)
-        
-        
-        # if self.controller.getAButton():
-            # self.drivetrain.
-
-        # if self.controller.getStartButton():
-        #     self.cancel_all()
-
-        # if (
-        #     self.controller.getRightTriggerAxis() > 0.2
-        #     and not self.intake.has_note()
-        #     and not self.shooter.has_note()
-        #     and self.intake.state not in [IntakeStates.RETRACTING, IntakeStates.FEEDING]
-        # ):
-        #     self.intake.grab_note()
-        # elif (
-        #     self.intake.state == IntakeStates.DEPLOYED
-        #     or self.shooter.state == ShooterStates.HOLDING
-        # ) and not self.intake.has_note():
-        #     self.intake.go_to_idle()
-        # elif self.intake.state in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
-        #     self.shooter.feed()
-
-        # if self.shooter.has_note():
-        #     if self.shooter.state != ShooterStates.SHOOTING:
-        #         if self.controller.getPOV() == 0:
-        #             self.shooter.aim(5)
-        #         elif self.controller.getPOV() == 90:
-        #             self.shooter.aim(15)
-        #         elif self.controller.getPOV() == 90:
-        #             self.shooter.aim(25)
-        #         elif self.controller.getPOV() == 90:
-        #             self.shooter.aim(35)
-
-        #     if self.controller.getLeftTriggerAxis() > 0.2:
-        #         if (
-        #             self.shooter.state == ShooterStates.HOLDING
-        #         ):  # Direct shot, no preaiming
-        #             self.shooter.aim(40, True)
-        #         elif self.shooter.state == ShooterStates.AIMING:
-        #             self.shooter.shoot()
 
     def robotPeriodic(self) -> None:
-        # Stops unimportant notifications during comp
-        # IO.update_publishers()
         IO._handle_signal_refreshing()
-        self.watchdog.addEpoch("I/O")
-
-        NotificationManager.send_notifications(DriverStation.isFMSAttached())
-        self.watchdog.addEpoch("Notification Sending")
-
         SmartDashboard.updateValues()
 
     def _drive_with_joystick(self) -> None:
-        vx = (
-            utils.filter_input(self.controller.getLeftY())
-            * self.drivetrain_config.max_translation_speed
-        )
-        vy = (
-            utils.filter_input(self.controller.getLeftX())
-            * self.drivetrain_config.max_translation_speed
-        )
-        omega = (
-            utils.filter_input(self.controller.getRightX())
-            * self.drivetrain_config.max_rotation_speed
-        )
+        vx = utils.filter_input(self.controller.getLeftY()) * self.drivetrain_config.max_translation_speed
+        vy = utils.filter_input(self.controller.getLeftX()) * self.drivetrain_config.max_translation_speed
+        omega = utils.filter_input(self.controller.getRightX()) * self.drivetrain_config.max_rotation_speed
 
         if self.isReal():
             self.drivetrain.signal = DriveSignal(ChassisSpeeds(-vx, -vy, -omega))
         else:
             self.drivetrain.signal = DriveSignal(ChassisSpeeds(vx, vy, omega))
 
-    def _set_up_notifications(self) -> None:
-        NotificationManager.add_conditional_notification(
-            Notification(
-                level=NotificationLevel.WARNING,
-                title="Low Battery Voltage",
-                description="Consider swapping batteries soon",
-            ),
-            lambda: (RobotController.getBatteryVoltage() < 8 and self.isReal())
-            or (
-                RobotController.getBatteryVoltage() < 12.25
-                and self.isDisabled()
-                and self.isReal()
-            )
-            # The sims are harder on battery voltage
-            or (RobotController.getBatteryVoltage() < 6 and self.isSimulation()),
-        )
-
-        NotificationManager.add_conditional_notification(
-            Notification(
-                level=NotificationLevel.ERROR,
-                title="Robot is browning out",
-                description="Stop robot and replace battery",
-            ),
-            lambda: RobotController.isBrownedOut(),
-        )
-
-    # def cancel_all(self) -> None:
-    #     self.intake.eject()
-    #     self.shooter.eject()
+if __name__ == "__main__":
+    import wpilib
+    wpilib.run(MyRobot)
