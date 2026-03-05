@@ -48,7 +48,7 @@ class MyRobot(MagicRobot):
         # LED Hardware: Single strip of 29 LEDs on Port 0
         self.led_strip = AddressableLED(0) 
 
-        # Drivetrain Config
+        # Drivetrain ConfigFle
         swerve_config = SwerveConfig(
             drive_ratio=1 / 7.7142857,
             steer_ratio=1 / 7.7142857 if self.isReal() else 1 / 25.9,
@@ -95,7 +95,7 @@ class MyRobot(MagicRobot):
         with self.consumeExceptions():
             self._drive_with_joystick()
         if  self.controller.getXButton():
-            self.drivetrain.disable_motion_limiting()
+            self.drivetrain.enable_motion_limiting()
         else: 
             self.drivetrain.enable_motion_limiting()
             
