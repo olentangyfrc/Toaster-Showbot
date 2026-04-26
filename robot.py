@@ -11,6 +11,7 @@ from wpilib import (
     SmartDashboard,
     Timer,
     XboxController,
+    SendableChooser,
 )
 from wpilib.deployinfo import getDeployData
 from wpimath.kinematics import ChassisSpeeds
@@ -35,26 +36,39 @@ class MyRobot(MagicRobot):
     def createObjects(self) -> None:
         DataLogManager.start()
         
-        # Metadata for Advantagescope/Elastic
+        # --- Metadata Setup ---
         meta_table = NetworkTableInstance.getDefault().getTable("Metadata")
         deploy_info = getDeployData()
         if deploy_info:
             for key, value in deploy_info.items():
                 meta_table.putString(key, value)
 
+        # --- Dashboard Setup ---
+        # Tab 1: Mode Selection
+        self.mode_chooser = SendableChooser()
+        for mode in LEDMode:
+            self.mode_chooser.addOption(mode.name, mode)
+        self.mode_chooser.setDefaultOption(LEDMode.PULSE.name, LEDMode.PULSE)
+        SmartDashboard.putData("LED/Mode Selector", self.mode_chooser)
+
+        # Tab 2: Manual Tuning (Only active in Disabled)
+        SmartDashboard.putNumber("LED/Manual/Red", 255)
+        SmartDashboard.putNumber("LED/Manual/Green", 0)
+        SmartDashboard.putNumber("LED/Manual/Blue", 0)
+        SmartDashboard.putNumber("LED/Manual/BPM", 45)
+        SmartDashboard.putNumber("LED/Manual/Tail", 5)
+
         self.controller = XboxController(0)
         self.CANbus = CANBus("*")
-
-        # LED Hardware: Single strip of 29 LEDs on Port 0
         self.led_strip = AddressableLED(0) 
 
-        # Drivetrain ConfigFle
+        # --- Drivetrain Config ---
         swerve_config = SwerveConfig(
             drive_ratio=1 / 7.7142857,
             steer_ratio=1 / 7.7142857 if self.isReal() else 1 / 25.9,
-            steer_pid_constants=PIDConstants(3.7, 0, 0.05),
-            drive_pid_constants=PIDConstants(0.5, 0, 0),
-            ff_constants=FFConstants(0.2278, 2.4176, 0),
+            steer_pid_constants=PIDConstants(0, 0, 0.0),
+            drive_pid_constants=PIDConstants(0, 0, 0),
+            ff_constants=FFConstants(0, 0, 0),
             wheel_radius=0.08592 / 2,
             drive_motor_type=MotorTypes.FALCON_500,
         )
@@ -87,19 +101,29 @@ class MyRobot(MagicRobot):
 
     def disabledInit(self) -> None:
         IO.flush_publishers()
+        
+    def disabledPeriodic(self) -> None:
+        """
+        Dashboard Control Mode:
+        When disabled, the robot reads from the SmartDashboard tabs.
+        """
+        self.led_control.mode = self.mode_chooser.getSelected()
+        
+        # Pull manual colors/speed from Dashboard Tab 2
+        r = int(SmartDashboard.getNumber("LED/Manual/Red", 255))
+        g = int(SmartDashboard.getNumber("LED/Manual/Green", 0))
+        b = int(SmartDashboard.getNumber("LED/Manual/Blue", 0))
+        self.led_control.color = Color8Bit(r, g, b)
+        self.led_control.speed_bpm = SmartDashboard.getNumber("LED/Manual/BPM", 45)
+        self.led_control.tail_length = int(SmartDashboard.getNumber("LED/Manual/Tail", 5))
+        
+        self.led_control.execute()
 
     def teleopPeriodic(self) -> None:
         if not self.timer.isRunning():
             self.timer.restart()
 
-        with self.consumeExceptions():
-            self._drive_with_joystick()
-        if  self.controller.getXButton():
-            self.drivetrain.enable_motion_limiting()
-        else: 
-            self.drivetrain.enable_motion_limiting()
-            
-        
+        self._drive_with_joystick()
 
         # --- D-Pad Mode Cycling ---
         pov = self.controller.getPOV()
@@ -113,8 +137,15 @@ class MyRobot(MagicRobot):
         if self.controller.getAButtonPressed():
             self.led_control.mode = LEDMode.OFF
 
-        # --- LED Mode Configurations ---
-        # We only assign values here. The math happens in components/leds.py
+        # --- ORIGINAL PRESETS ---
+        # These will override whatever is on the dashboard once teleop starts.
+        self.apply_presets()
+        
+        # Logic is already handled in apply_presets, now just execute
+        self.led_control.execute()
+
+    def apply_presets(self) -> None:
+        """Your original hard-coded LED configurations."""
         mode = self.led_control.mode
 
         if mode == LEDMode.METEOR:
@@ -157,10 +188,6 @@ class MyRobot(MagicRobot):
             
         elif mode == LEDMode.FLAMES:
             self.led_control.speed_bpm = 45
-
-        # --- Drivetrain Utilities ---
-        if self.controller.getYButtonPressed():
-            self.drivetrain.gyro.set_yaw(0)
 
     def robotPeriodic(self) -> None:
         IO._handle_signal_refreshing()
