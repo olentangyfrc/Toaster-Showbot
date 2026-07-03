@@ -16,7 +16,6 @@ from wpilib.deployinfo import getDeployData
 from wpimath.kinematics import ChassisSpeeds
 
 # Components
-from components.climber import Climber
 from components.leds import LEDController, LEDMode
 from components.drivetrain import DriveSignal, Drivetrain
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
@@ -29,7 +28,6 @@ from utilities.IO_helpers import IO
 
 class MyRobot(MagicRobot):
     drivetrain: Drivetrain
-    climber: Climber
     led_control: LEDController  # MagicBot injects this
 
     def createObjects(self) -> None:
