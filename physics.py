@@ -57,9 +57,9 @@ class TalonFXMotorSim(SimSystem):
         ):
             sim_state.set_supply_voltage(12)
             if invert:
-                sim_state.orientation = ChassisReference.Clockwise_Positive
+                sim_state.orientation = ChassisReference.CLOCKWISE_POSITIVE
             else:
-                sim_state.orientation = ChassisReference.CounterClockwise_Positive
+                sim_state.orientation = ChassisReference.COUNTER_CLOCKWISE_POSITIVE
 
     def update(self, dt: units.seconds) -> None:
         ratio = self.gearing / math.tau
@@ -96,9 +96,9 @@ class TalonFXArmSim(SimSystem):
         ):
             sim_state.set_supply_voltage(12)
             if invert:
-                sim_state.orientation = ChassisReference.Clockwise_Positive
+                sim_state.orientation = ChassisReference.CLOCKWISE_POSITIVE
             else:
-                sim_state.orientation = ChassisReference.CounterClockwise_Positive
+                sim_state.orientation = ChassisReference.COUNTER_CLOCKWISE_POSITIVE
 
     def update(self, dt: units.seconds) -> None:
         ratio = self.gearing / math.tau
@@ -129,9 +129,9 @@ class TalonFXElevatorSim(SimSystem):
         ):
             sim_state.set_supply_voltage(12)
             if invert:
-                sim_state.orientation = ChassisReference.Clockwise_Positive
+                sim_state.orientation = ChassisReference.CLOCKWISE_POSITIVE
             else:
-                sim_state.orientation = ChassisReference.CounterClockwise_Positive
+                sim_state.orientation = ChassisReference.COUNTER_CLOCKWISE_POSITIVE
 
     def update(self, dt: units.seconds) -> None:
         volts = self.sim_states[0].motor_voltage

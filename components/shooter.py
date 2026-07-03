@@ -9,7 +9,7 @@ from phoenix6.configs import TalonFXConfiguration
 from phoenix6.controls import VoltageOut
 from phoenix6.hardware import TalonFX
 from phoenix6.signals import InvertedValue, NeutralModeValue
-from rev import SparkBaseConfig, SparkMax
+from rev import SparkBaseConfig, SparkMax, ResetMode, PersistMode
 from wpilib import (
     Color8Bit,
     DigitalInput,
@@ -121,8 +121,8 @@ class Shooter:
         self.indexer = SparkMax(config.indexer_id, SparkMax.MotorType.kBrushless)
         self.indexer.configure(
             self.indexer_config,
-            SparkMax.ResetMode.kResetSafeParameters,
-            SparkMax.PersistMode.kNoPersistParameters,
+            ResetMode.kResetSafeParameters,
+            PersistMode.kNoPersistParameters,
         )
 
         self._state = ShooterStates.IDLE

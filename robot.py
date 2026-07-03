@@ -66,7 +66,7 @@ class MyRobot(MagicRobot):
             drive_pid_constants=PIDConstants(0.5, 0, 0),
             ff_constants=FFConstants(0.2278, 2.4176, 0),
             wheel_radius=0.08592 / 2,
-            drive_motor_type=MotorTypes.KRAKEN_X60_FOC,
+            drive_motor_type=MotorTypes.FALCON_500,
         )
 
         self.drivetrain_config = DrivetrainConfig(
