@@ -10,7 +10,6 @@ from wpilib import (
     SmartDashboard,
     Timer,
     XboxController,
-    AddressableLED,
 )
 from wpilib.deployinfo import getDeployData
 from wpimath.geometry import Pose2d, Rotation2d
@@ -21,7 +20,6 @@ from components.drivetrain import DriveSignal, Drivetrain
 from components.intake import Intake, IntakeStates
 from components.modules.generic_talon_fx_module import GenericTalonFXModule
 from components.shooter import Shooter, ShooterStates
-from components.leds import LEDController, LEDMode
 from utilities import helpers as utils
 from utilities.configs import (
     DrivetrainConfig,
@@ -39,7 +37,6 @@ class MyRobot(MagicRobot):
     climber: Climber
     intake: Intake
     shooter: Shooter
-    led_control: LEDController
 
     def createObjects(self) -> None:
         DataLogManager.start()
@@ -191,56 +188,6 @@ class MyRobot(MagicRobot):
         self.watchdog.addEpoch("Notification Sending")
 
         SmartDashboard.updateValues()
-
-                # A Button: Reset to OFF
-        if self.controller.getAButtonPressed():
-            self.led_control.mode = LEDMode.PULSE
-
-        # --- LED Mode Configurations ---
-        # We only assign values here. The math happens in components/leds.py
-        mode = self.led_control.mode
-
-        if mode == LEDMode.METEOR:
-            self.led_control.color = Color8Bit(0, 255, 0)
-            self.led_control.speed_bpm = 80 
-            self.led_control.tail_length = 2 
-
-        elif mode == LEDMode.PULSE:
-            self.led_control.color = Color8Bit(255, 0, 0) # Red Heartbeat
-            self.led_control.speed_bpm = 45 
-
-        elif mode == LEDMode.RAINBOW:
-            self.led_control.speed_bpm = 45 
-        
-        elif mode == LEDMode.SNAKE:
-            self.led_control.color = Color8Bit(255, 0, 0)
-            self.led_control.tail_length = 4
-            self.led_control.speed_bpm = 30
-            
-        elif mode == LEDMode.MATRIX:
-            self.led_control.speed_bpm = 10 
-            self.led_control.tail_length = 12 
-            
-        elif mode == LEDMode.BOUNCE:
-            self.led_control.color = Color8Bit(255, 0, 0) 
-            self.led_control.speed_bpm = 40
-            self.led_control.tail_length = 10
-            
-        elif mode == LEDMode.CONFETTI:
-            self.led_control.speed_bpm = 60 
-            self.led_control.tail_length = 5
-            
-        elif mode == LEDMode.BREATH:
-            self.led_control.color = Color8Bit(255, 0, 255) 
-            self.led_control.speed_bpm = 15 
-            
-        elif mode == LEDMode.SCROLL:
-            self.led_control.color = Color8Bit(255, 100, 0) 
-            self.led_control.speed_bpm = 25
-            
-        elif mode == LEDMode.FLAMES:
-            self.led_control.speed_bpm = 45
-
 
     def _drive_with_joystick(self) -> None:
         vx = (
