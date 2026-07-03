@@ -239,7 +239,7 @@ class Shooter:
             self.io.flywheel_voltage = 0.0
 
         else:
-            self.io.pivot_voltage = 2.0  # Moves the shooter slowly up until in bounds
+            self.io.pivot_voltage = 0.0  # Moves the shooter slowly up until in bounds
             self.io.flywheel_voltage = 0.0
 
         if RobotBase.isSimulation():
@@ -248,7 +248,7 @@ class Shooter:
 
         self.pivot_motor.set_control(
             self.pivot_voltage_request.with_output(
-                self.io.pivot_voltage
+                0.0
             ).with_enable_foc(False)
         )
         self.top_flywheel_motor.set_control(

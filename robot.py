@@ -98,7 +98,7 @@ class MyRobot(MagicRobot):
             pivot_motor_id=31,
             gear_ratio=16 / 510,
             pivot_ff=FFConstants(0.19, 0, 0, 0.41),
-            pivot_pid=PIDConstants(5.3, 0, 0.07),
+            pivot_pid=PIDConstants(2, 0, 0.07),
             profile_constants=ProfileConstants(0, 0),  # TODO: probably implement these
             CANbus=self.CANbus,
         )
@@ -112,11 +112,11 @@ class MyRobot(MagicRobot):
             shooter_speed_ff=FFConstants(0.0862775, 0.113191/4, 0, 0),
             shooter_gear_ratio=12 / 15,
             pivot_abs_encoder_id=0,
-            pivot_pid=PIDConstants(20, 5, 0),
+            pivot_pid=PIDConstants(0, 0, 0),
             pivot_profile_constraints=ProfileConstants(
                 9999, 1000
             ),  # TODO: probably implement these
-            pivot_ff=FFConstants(0, 0.03, 0, 0),
+            pivot_ff=FFConstants(0, 0, 0, 0),
             pivot_gear_ratio=1 / 108,
             CANbus=self.CANbus,
         )
@@ -171,12 +171,12 @@ class MyRobot(MagicRobot):
         elif self.intake.state in [IntakeStates.RETRACTING, IntakeStates.FEEDING]:
             self.shooter.feed()
         
-        if (
-            self.controller.getLeftTriggerAxis() > 0.2 and
-            self.shooter.state == ShooterStates.HOLDING and
-            self.shooter.has_note()
-        ):
-            self.shooter.shoot()
+        #if (
+        #    self.controller.getLeftTriggerAxis() > 0.2 and
+         #   self.shooter.state == ShooterStates.HOLDING and
+         #   self.shooter.has_note()
+        #):
+         #   self.shooter.shoot()
 
 
     def robotPeriodic(self) -> None:
